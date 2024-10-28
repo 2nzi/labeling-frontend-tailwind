@@ -1,23 +1,23 @@
 <template>
-  <div class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg">
+  <div class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg" @wheel="handleWheel">
     <!-- Contrôles de la timeline -->
-    <TimelineControls
-      :isPlaying="isPlaying"
-      :currentTime="currentTime"
-      @togglePlayPause="togglePlayPause"
-      @zoomIn="zoomIn"
-      @zoomOut="zoomOut"
-      @scrollLeft="scrollLeft"
-      @scrollRight="scrollRight"
+    <TimelineControls 
+      :isPlaying="isPlaying" 
+      :currentTime="currentTime" 
+      @togglePlayPause="togglePlayPause" 
+      @zoomIn="zoomIn" 
+      @zoomOut="zoomOut" 
+      @scrollLeft="scrollLeft" 
+      @scrollRight="scrollRight" 
     />
 
     <!-- Conteneur de la timeline -->
     <div class="relative mt-4 w-full overflow-hidden">
       <!-- Graduations -->
-      <TimelineGraduation :duration="duration" :zoomLevel="zoomLevel" :scrollOffset="scrollOffset" />
+      <TimelineGraduation :duration="duration" :visibleDuration="visibleDuration" :scrollOffset="scrollOffset" />
 
       <!-- Curseur de lecture -->
-      <TimelineCursor :currentTime="currentTime" :duration="duration" :zoomLevel="zoomLevel" :scrollOffset="scrollOffset" />
+      <TimelineCursor :currentTime="currentTime" :duration="duration" :visibleDuration="visibleDuration" :scrollOffset="scrollOffset" />
 
       <!-- Lignes d'événements -->
       <div class="event-rows">
@@ -45,8 +45,8 @@ export default {
       isPlaying: false,
       currentTime: 0,
       duration: 100,
-      zoomLevel: 1,
-      scrollOffset: 0, // Position de défilement de la timeline
+      visibleDuration: 20,
+      scrollOffset: 0,
       events: [
         { name: "Takeoff" },
         { name: "Carve" },
@@ -74,33 +74,41 @@ export default {
       }, 10);
     },
     zoomIn() {
-      if (this.zoomLevel < 5) {
-        this.zoomLevel += 0.5;
-        this.adjustScrollOffset();
-      }
+      this.updateZoom(this.visibleDuration * 0.95); // Sensibilité plus faible pour zoomer
     },
     zoomOut() {
-      if (this.zoomLevel > 0.5) {
-        this.zoomLevel -= 0.5;
-        this.adjustScrollOffset();
+      this.updateZoom(this.visibleDuration * 1.05); // Sensibilité plus faible pour dézoomer
+    },
+    updateZoom(newVisibleDuration) {
+      const cursorPosition = this.currentTime;
+
+      // Ajuster `scrollOffset` pour centrer le zoom autour du curseur
+      this.scrollOffset = cursorPosition - (newVisibleDuration / 2);
+
+      // Empêcher les valeurs négatives et ajuster pour éviter les dépassements
+      if (this.scrollOffset < 0) this.scrollOffset = 0;
+      if (this.scrollOffset + newVisibleDuration > this.duration) {
+        this.scrollOffset = Math.max(0, this.duration - newVisibleDuration);
+      }
+
+      this.visibleDuration = newVisibleDuration;
+    },
+    handleWheel(event) {
+      event.preventDefault();
+      if (event.deltaY < 0) {
+        // Zoom avant
+        this.zoomIn();
+      } else if (event.deltaY > 0) {
+        // Zoom arrière
+        this.zoomOut();
       }
     },
     scrollLeft() {
-      const scrollStep = 5 / this.zoomLevel;
-      this.scrollOffset = Math.max(0, this.scrollOffset - scrollStep);
+      this.scrollOffset = Math.max(0, this.scrollOffset - this.visibleDuration * 0.1);
     },
     scrollRight() {
-      const scrollStep = 5 / this.zoomLevel;
-      const maxScroll = this.duration - this.getVisibleDuration();
-      this.scrollOffset = Math.min(maxScroll, this.scrollOffset + scrollStep);
+      this.scrollOffset = Math.min(this.duration - this.visibleDuration, this.scrollOffset + this.visibleDuration * 0.1);
     },
-    getVisibleDuration() {
-      return this.duration / this.zoomLevel;
-    },
-    adjustScrollOffset() {
-      const maxScroll = this.duration - this.getVisibleDuration();
-      this.scrollOffset = Math.min(this.scrollOffset, maxScroll);
-    }
   },
   beforeUnmount() {
     clearInterval(this.playbackInterval);

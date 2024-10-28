@@ -1,42 +1,28 @@
 <template>
-  <div class="timeline-graduation relative w-full flex justify-between">
+  <div class="timeline-graduation flex justify-between">
     <div
-      v-for="tick in visibleTicks"
-      :key="tick"
-      :style="{ left: `${tick.position}%` }"
-      class="timeline-tick"
+      v-for="mark in graduationMarks"
+      :key="mark"
+      :style="{ left: `${(mark - scrollOffset) / visibleDuration * 100}%` }"
+      class="graduation-mark"
     >
-      <span>{{ tick.label }}</span>
+      {{ mark }}
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  props: ["duration", "zoomLevel", "scrollOffset"],
+  props: ["duration", "visibleDuration", "scrollOffset"],
   computed: {
-    visibleTicks() {
-      const ticks = [];
-      const visibleDuration = this.duration / this.zoomLevel;
-      const interval = this.getTickInterval();
-      const startTime = this.scrollOffset;
-      const endTime = this.scrollOffset + visibleDuration;
-
-      for (let i = startTime; i <= endTime; i += interval) {
-        const relativePosition = ((i - this.scrollOffset) / visibleDuration) * 100;
-        ticks.push({
-          label: Math.floor(i),
-          position: relativePosition,
-        });
+    graduationMarks() {
+      const step = Math.ceil(this.visibleDuration / 10);
+      const start = Math.floor(this.scrollOffset / step) * step;
+      const marks = [];
+      for (let i = start; i <= this.scrollOffset + this.visibleDuration; i += step) {
+        marks.push(i);
       }
-      return ticks;
-    },
-  },
-  methods: {
-    getTickInterval() {
-      if (this.zoomLevel >= 4) return 1;
-      if (this.zoomLevel >= 2) return 5;
-      return 10;
+      return marks;
     },
   },
 };
@@ -44,13 +30,13 @@ export default {
 
 <style scoped>
 .timeline-graduation {
+  position: relative;
   height: 20px;
   background-color: #333;
 }
-.timeline-tick {
+.graduation-mark {
   position: absolute;
-  top: 0;
-  font-size: 10px;
   color: #ccc;
+  font-size: 12px;
 }
 </style>
