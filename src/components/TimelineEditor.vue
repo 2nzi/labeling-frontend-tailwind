@@ -2,7 +2,9 @@
   <div
     class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg"
     @wheel="handleWheel"
-    @keydown.delete="confirmDeletion"
+    @click="deselectAll"
+    @keydown.delete="deleteSelectedElement"
+    @keydown.a="addBlockToSelectedEvent"
     tabindex="0"
   >
     <!-- Contrôles de la timeline -->
@@ -32,9 +34,8 @@
         :duration="duration"
         :visibleDuration="visibleDuration"
         :scrollOffset="scrollOffset"
-        :rowCount="events.length + 1" 
+        :rowCount="events.length + 1"
       />
-
 
       <!-- Lignes d'événements -->
       <div class="event-rows">
@@ -43,7 +44,12 @@
           :key="index"
           :event="event"
           :isSelected="selectedEvent === index"
+          :selectedBlock="selectedBlock"
+          :scrollOffset="scrollOffset"
+          :visibleDuration="visibleDuration"
           @select="selectEvent(index)"
+          @selectBlock="selectBlock"
+          @updateBlockStart="updateBlockStart"
         />
         <!-- Bouton d'ajout de ligne -->
         <div class="add-event-row" @click="addEvent">
@@ -52,7 +58,7 @@
       </div>
     </div>
 
-    <!-- Boîte de dialogue de confirmation pour la suppression -->
+    <!-- Boîte de dialogue de confirmation pour la suppression d'un événement -->
     <ConfirmationDialog
       :visible="showConfirmation"
       message="Êtes-vous sûr de vouloir supprimer cet événement ?"
@@ -85,12 +91,13 @@ export default {
       visibleDuration: 20,
       scrollOffset: 0,
       selectedEvent: null,
+      selectedBlock: null,
       showConfirmation: false,
       events: [
-        { name: "Takeoff" },
-        { name: "Carve" },
-        { name: "360" },
-        { name: "Roller" },
+        { name: "Takeoff", blocks: [] },
+        { name: "Carve", blocks: [] },
+        { name: "360", blocks: [] },
+        { name: "Roller", blocks: [] },
       ],
     };
   },
@@ -105,14 +112,11 @@ export default {
     },
     startPlayback() {
       this.playbackInterval = setInterval(() => {
-        if (this.currentTime >= this.duration - 5) {
-          this.currentTime = this.duration - 5;
-          this.isPlaying = false;
-          clearInterval(this.playbackInterval);
+        if (this.currentTime >= this.duration) {
+          this.currentTime = 0;
         } else {
           this.currentTime += 0.01;
         }
-
         const cursorPosition = this.currentTime;
         const endVisibleTime = this.scrollOffset + this.visibleDuration;
 
@@ -121,8 +125,17 @@ export default {
         }
       }, 10);
     },
-    confirmDeletion() {
-      if (this.selectedEvent !== null) {
+    deleteSelectedElement() {
+      if (this.selectedBlock) {
+        if (this.selectedEvent !== null && this.selectedEvent < this.events.length) {
+          const event = this.events[this.selectedEvent];
+          const blockIndex = event.blocks.indexOf(this.selectedBlock);
+          if (blockIndex !== -1) {
+            event.blocks.splice(blockIndex, 1);
+            this.selectedBlock = null;
+          }
+        }
+      } else {
         this.showConfirmation = true;
       }
     },
@@ -133,25 +146,38 @@ export default {
         this.showConfirmation = false;
       }
     },
+    addBlockToSelectedEvent() {
+      if (this.selectedEvent !== null) {
+        const event = this.events[this.selectedEvent];
+        const blockIndex = event.blocks.length + 1;
+        event.blocks.push({
+          name: `${event.name}_${blockIndex}`,
+          start: this.currentTime,
+          duration: 3,
+        });
+      }
+    },
+    updateBlockStart(index, newStart) {
+      if (this.selectedEvent !== null) {
+        this.events[this.selectedEvent].blocks[index].start = newStart;
+      }
+    },
     zoomIn() {
       this.updateZoom(this.visibleDuration * 0.95);
     },
     zoomOut() {
       this.updateZoom(this.visibleDuration * 1.05);
     },
-
     updateZoom(newVisibleDuration) {
       if (newVisibleDuration > this.duration) {
         newVisibleDuration = this.duration;
       }
-
       const cursorPosition = this.currentTime;
       this.scrollOffset = cursorPosition - (newVisibleDuration / 2);
       if (this.scrollOffset < 0) this.scrollOffset = 0;
       if (this.scrollOffset + newVisibleDuration > this.duration) {
         this.scrollOffset = Math.max(0, this.duration - newVisibleDuration);
       }
-
       this.visibleDuration = newVisibleDuration;
     },
     handleWheel(event) {
@@ -176,15 +202,26 @@ export default {
       this.scrollOffset = Math.min(this.duration - this.visibleDuration, this.scrollOffset + this.visibleDuration * 0.1);
     },
     setCursorTime(time) {
-      this.currentTime = Math.min(this.duration - 5, Math.max(0, time));
+      this.currentTime = Math.min(this.duration, Math.max(0, time));
+    },
+    deselectAll(event) {
+      if (!event.target.closest('.timeline-event-row') && !event.target.closest('.event-block')) {
+        this.selectedEvent = null;
+        this.selectedBlock = null;
+      }
     },
     selectEvent(index) {
-      this.selectedEvent = this.selectedEvent === index ? null : index;
+      this.selectedEvent = index;
+      this.selectedBlock = null;
+    },
+    selectBlock(block) {
+      this.selectedBlock = block;
+      this.selectedEvent = this.events.findIndex(event => event.blocks.includes(block));
     },
     addEvent() {
       const newEventName = `Event${this.events.length + 1}`;
-      this.events.push({ name: newEventName });
-    }
+      this.events.push({ name: newEventName, blocks: [] });
+    },
   },
   beforeUnmount() {
     clearInterval(this.playbackInterval);
