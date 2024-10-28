@@ -1,7 +1,9 @@
 <template>
   <div
-    class="timeline-editor mx-auto bg-[#464646] text-white p-4 rounded-lg"
+    class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg"
     @wheel="handleWheel"
+    @keydown.delete="confirmDeletion"
+    tabindex="0"
   >
     <!-- Contrôles de la timeline -->
     <TimelineControls 
@@ -24,13 +26,15 @@
         @timeSelected="setCursorTime"
       />
 
-      <!-- Curseur de lecture -->
+      <!-- Curseur de lecture avec tête -->
       <TimelineCursor
         :currentTime="currentTime"
         :duration="duration"
         :visibleDuration="visibleDuration"
         :scrollOffset="scrollOffset"
+        :rowCount="events.length + 1" 
       />
+
 
       <!-- Lignes d'événements -->
       <div class="event-rows">
@@ -38,9 +42,23 @@
           v-for="(event, index) in events"
           :key="index"
           :event="event"
+          :isSelected="selectedEvent === index"
+          @select="selectEvent(index)"
         />
+        <!-- Bouton d'ajout de ligne -->
+        <div class="add-event-row" @click="addEvent">
+          + Ajouter un événement
+        </div>
       </div>
     </div>
+
+    <!-- Boîte de dialogue de confirmation pour la suppression -->
+    <ConfirmationDialog
+      :visible="showConfirmation"
+      message="Êtes-vous sûr de vouloir supprimer cet événement ?"
+      @confirm="deleteSelectedEvent"
+      @cancel="showConfirmation = false"
+    />
   </div>
 </template>
 
@@ -49,6 +67,7 @@ import TimelineControls from './TimelineControls.vue';
 import TimelineGraduation from './TimelineGraduation.vue';
 import TimelineCursor from './TimelineCursor.vue';
 import TimelineEventRow from './TimelineEventRow.vue';
+import ConfirmationDialog from './ConfirmationDialog.vue';
 
 export default {
   components: {
@@ -56,6 +75,7 @@ export default {
     TimelineGraduation,
     TimelineCursor,
     TimelineEventRow,
+    ConfirmationDialog,
   },
   data() {
     return {
@@ -64,6 +84,8 @@ export default {
       duration: 100,
       visibleDuration: 20,
       scrollOffset: 0,
+      selectedEvent: null,
+      showConfirmation: false,
       events: [
         { name: "Takeoff" },
         { name: "Carve" },
@@ -83,45 +105,48 @@ export default {
     },
     startPlayback() {
       this.playbackInterval = setInterval(() => {
-        if (this.currentTime >= this.duration) {
-          this.currentTime = 0; // Recommence à 0 si la fin de la vidéo est atteinte
+        if (this.currentTime >= this.duration - 5) {
+          this.currentTime = this.duration - 5;
+          this.isPlaying = false;
+          clearInterval(this.playbackInterval);
         } else {
-          this.currentTime += 0.01; // Avance le curseur
+          this.currentTime += 0.01;
         }
 
-        // Si le curseur dépasse la fenêtre visible, ajuster `scrollOffset` pour le mettre tout à gauche
         const cursorPosition = this.currentTime;
         const endVisibleTime = this.scrollOffset + this.visibleDuration;
 
         if (cursorPosition > endVisibleTime) {
-          this.scrollOffset = cursorPosition;
-
-          // Assurez-vous que `scrollOffset` reste dans les limites valides
-          if (this.scrollOffset + this.visibleDuration > this.duration) {
-            this.scrollOffset = Math.max(0, this.duration - this.visibleDuration);
-          }
+          this.scrollOffset = cursorPosition - this.visibleDuration + 1;
         }
-      }, 10); // Avance de 10ms pour une mise à jour fluide
+      }, 10);
+    },
+    confirmDeletion() {
+      if (this.selectedEvent !== null) {
+        this.showConfirmation = true;
+      }
+    },
+    deleteSelectedEvent() {
+      if (this.selectedEvent !== null) {
+        this.events.splice(this.selectedEvent, 1);
+        this.selectedEvent = null;
+        this.showConfirmation = false;
+      }
     },
     zoomIn() {
-      this.updateZoom(this.visibleDuration * 0.95); // Sensibilité plus faible pour zoomer
+      this.updateZoom(this.visibleDuration * 0.95);
     },
     zoomOut() {
-      this.updateZoom(this.visibleDuration * 1.05); // Sensibilité plus faible pour dézoomer
+      this.updateZoom(this.visibleDuration * 1.05);
     },
 
     updateZoom(newVisibleDuration) {
-      // Assurez-vous que le nouveau zoom ne dépasse pas la durée totale
       if (newVisibleDuration > this.duration) {
         newVisibleDuration = this.duration;
       }
 
       const cursorPosition = this.currentTime;
-
-      // Ajuster `scrollOffset` pour centrer le zoom autour du curseur
       this.scrollOffset = cursorPosition - (newVisibleDuration / 2);
-
-      // Empêcher les valeurs négatives et ajuster pour éviter les dépassements
       if (this.scrollOffset < 0) this.scrollOffset = 0;
       if (this.scrollOffset + newVisibleDuration > this.duration) {
         this.scrollOffset = Math.max(0, this.duration - newVisibleDuration);
@@ -132,14 +157,12 @@ export default {
     handleWheel(event) {
       event.preventDefault();
       if (event.ctrlKey) {
-        // Si Ctrl est enfoncé, zoomer ou dézoomer
         if (event.deltaY < 0) {
           this.zoomIn();
         } else if (event.deltaY > 0) {
           this.zoomOut();
         }
       } else {
-        // Si Ctrl n'est pas enfoncé, faire défiler horizontalement
         this.scrollOffset = Math.max(
           0,
           Math.min(this.scrollOffset + event.deltaY * 0.1, this.duration - this.visibleDuration)
@@ -153,8 +176,14 @@ export default {
       this.scrollOffset = Math.min(this.duration - this.visibleDuration, this.scrollOffset + this.visibleDuration * 0.1);
     },
     setCursorTime(time) {
-      // Mettre à jour `currentTime` en fonction de la position temporelle cliquée
-      this.currentTime = Math.min(this.duration, Math.max(0, time)); // Assurer que le temps soit entre 0 et la durée maximale
+      this.currentTime = Math.min(this.duration - 5, Math.max(0, time));
+    },
+    selectEvent(index) {
+      this.selectedEvent = this.selectedEvent === index ? null : index;
+    },
+    addEvent() {
+      const newEventName = `Event${this.events.length + 1}`;
+      this.events.push({ name: newEventName });
     }
   },
   beforeUnmount() {
@@ -168,6 +197,18 @@ export default {
   width: 65%;
 }
 .event-rows {
-  background-color: #202020;
+  background-color: #333;
+}
+.add-event-row {
+  background-color: #444;
+  color: #aaa;
+  padding: 8px;
+  text-align: center;
+  cursor: pointer;
+  border-top: 1px solid #555;
+}
+.add-event-row:hover {
+  background-color: #555;
+  color: #fff;
 }
 </style>
