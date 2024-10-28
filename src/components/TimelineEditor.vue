@@ -1,5 +1,8 @@
 <template>
-  <div class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg" @wheel="handleWheel">
+  <div
+    class="timeline-editor mx-auto bg-[#464646] text-white p-4 rounded-lg"
+    @wheel="handleWheel"
+  >
     <!-- Contrôles de la timeline -->
     <TimelineControls 
       :isPlaying="isPlaying" 
@@ -14,14 +17,28 @@
     <!-- Conteneur de la timeline -->
     <div class="relative mt-4 w-full overflow-hidden">
       <!-- Graduations -->
-      <TimelineGraduation :duration="duration" :visibleDuration="visibleDuration" :scrollOffset="scrollOffset" />
+      <TimelineGraduation
+        :duration="duration"
+        :visibleDuration="visibleDuration"
+        :scrollOffset="scrollOffset"
+        @timeSelected="setCursorTime"
+      />
 
       <!-- Curseur de lecture -->
-      <TimelineCursor :currentTime="currentTime" :duration="duration" :visibleDuration="visibleDuration" :scrollOffset="scrollOffset" />
+      <TimelineCursor
+        :currentTime="currentTime"
+        :duration="duration"
+        :visibleDuration="visibleDuration"
+        :scrollOffset="scrollOffset"
+      />
 
       <!-- Lignes d'événements -->
       <div class="event-rows">
-        <TimelineEventRow v-for="(event, index) in events" :key="index" :event="event" />
+        <TimelineEventRow
+          v-for="(event, index) in events"
+          :key="index"
+          :event="event"
+        />
       </div>
     </div>
   </div>
@@ -67,11 +84,24 @@ export default {
     startPlayback() {
       this.playbackInterval = setInterval(() => {
         if (this.currentTime >= this.duration) {
-          this.currentTime = 0;
+          this.currentTime = 0; // Recommence à 0 si la fin de la vidéo est atteinte
         } else {
-          this.currentTime += 0.01;
+          this.currentTime += 0.01; // Avance le curseur
         }
-      }, 10);
+
+        // Si le curseur dépasse la fenêtre visible, ajuster `scrollOffset` pour le mettre tout à gauche
+        const cursorPosition = this.currentTime;
+        const endVisibleTime = this.scrollOffset + this.visibleDuration;
+
+        if (cursorPosition > endVisibleTime) {
+          this.scrollOffset = cursorPosition;
+
+          // Assurez-vous que `scrollOffset` reste dans les limites valides
+          if (this.scrollOffset + this.visibleDuration > this.duration) {
+            this.scrollOffset = Math.max(0, this.duration - this.visibleDuration);
+          }
+        }
+      }, 10); // Avance de 10ms pour une mise à jour fluide
     },
     zoomIn() {
       this.updateZoom(this.visibleDuration * 0.95); // Sensibilité plus faible pour zoomer
@@ -79,7 +109,13 @@ export default {
     zoomOut() {
       this.updateZoom(this.visibleDuration * 1.05); // Sensibilité plus faible pour dézoomer
     },
+
     updateZoom(newVisibleDuration) {
+      // Assurez-vous que le nouveau zoom ne dépasse pas la durée totale
+      if (newVisibleDuration > this.duration) {
+        newVisibleDuration = this.duration;
+      }
+
       const cursorPosition = this.currentTime;
 
       // Ajuster `scrollOffset` pour centrer le zoom autour du curseur
@@ -95,12 +131,19 @@ export default {
     },
     handleWheel(event) {
       event.preventDefault();
-      if (event.deltaY < 0) {
-        // Zoom avant
-        this.zoomIn();
-      } else if (event.deltaY > 0) {
-        // Zoom arrière
-        this.zoomOut();
+      if (event.ctrlKey) {
+        // Si Ctrl est enfoncé, zoomer ou dézoomer
+        if (event.deltaY < 0) {
+          this.zoomIn();
+        } else if (event.deltaY > 0) {
+          this.zoomOut();
+        }
+      } else {
+        // Si Ctrl n'est pas enfoncé, faire défiler horizontalement
+        this.scrollOffset = Math.max(
+          0,
+          Math.min(this.scrollOffset + event.deltaY * 0.1, this.duration - this.visibleDuration)
+        );
       }
     },
     scrollLeft() {
@@ -109,6 +152,10 @@ export default {
     scrollRight() {
       this.scrollOffset = Math.min(this.duration - this.visibleDuration, this.scrollOffset + this.visibleDuration * 0.1);
     },
+    setCursorTime(time) {
+      // Mettre à jour `currentTime` en fonction de la position temporelle cliquée
+      this.currentTime = Math.min(this.duration, Math.max(0, time)); // Assurer que le temps soit entre 0 et la durée maximale
+    }
   },
   beforeUnmount() {
     clearInterval(this.playbackInterval);
@@ -121,6 +168,6 @@ export default {
   width: 65%;
 }
 .event-rows {
-  background-color: #333;
+  background-color: #202020;
 }
 </style>

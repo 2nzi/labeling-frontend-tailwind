@@ -1,5 +1,8 @@
 <template>
-  <div class="timeline-graduation flex justify-between">
+  <div
+    class="timeline-graduation flex justify-between"
+    @click="handleClick"
+  >
     <div
       v-for="mark in graduationMarks"
       :key="mark"
@@ -25,6 +28,18 @@ export default {
       return marks;
     },
   },
+  methods: {
+    handleClick(event) {
+      // Calculer la position du clic relatif à la timeline graduation
+      const timelineWidth = this.$el.clientWidth;
+      const clickPosition = event.offsetX;
+      const clickTime =
+        this.scrollOffset + (clickPosition / timelineWidth) * this.visibleDuration;
+
+      // Émettre l'événement avec la position temporelle du clic
+      this.$emit("timeSelected", clickTime);
+    },
+  },
 };
 </script>
 
@@ -32,7 +47,7 @@ export default {
 .timeline-graduation {
   position: relative;
   height: 20px;
-  background-color: #333;
+  background-color: #202020;
 }
 .graduation-mark {
   position: absolute;

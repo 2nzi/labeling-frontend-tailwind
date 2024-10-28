@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container bg-gray-900 min-h-screen flex items-center justify-center p-4">
+  <div class="app-container bg-gray-200 min-h-screen flex items-center justify-center p-4">
     <!-- Composant principal de la timeline -->
     <TimelineEditor />
   </div>
