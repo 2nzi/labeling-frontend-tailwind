@@ -1,26 +1,25 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+  <div class="app-container bg-gray-900 min-h-screen flex items-center justify-center p-4">
+    <!-- Composant principal de la timeline -->
+    <TimelineEditor />
+  </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import TimelineEditor from './components/TimelineEditor.vue';
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
-  }
-}
+    TimelineEditor,
+  },
+};
 </script>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
+/* Styles globaux pour s'assurer que l'application prend tout l'écran */
+.app-container {
+  font-family: Arial, sans-serif;
+  color: #ffffff;
 }
 </style>
