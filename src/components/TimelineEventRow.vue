@@ -5,7 +5,16 @@
     @click="selectEvent"
   >
     <!-- Nom de l'événement -->
-    <span class="event-name">{{ event.name }}</span>
+    <span v-if="!isEditing" class="event-name" @dblclick="editEventName">{{ event.name }}</span>
+    <input
+      v-else
+      type="text"
+      v-model="editedName"
+      @blur="saveEventName"
+      @keyup.enter="saveEventName"
+      @keyup.esc="cancelEdit"
+      class="event-name-input"
+    />
 
     <!-- Blocs de l'événement -->
     <div
@@ -27,6 +36,8 @@ export default {
   props: ["event", "isSelected", "selectedBlock", "scrollOffset", "visibleDuration"],
   data() {
     return {
+      isEditing: false,
+      editedName: this.event.name,
       draggingBlockIndex: null,
       startX: 0,
       originalStart: 0,
@@ -34,7 +45,29 @@ export default {
   },
   methods: {
     selectEvent() {
-      this.$emit("select");
+      if (!this.isEditing) {
+        this.$emit("select");
+      }
+    },
+    editEventName() {
+      this.isEditing = true;
+      this.editedName = this.event.name;
+      this.$emit("editingStatus", true); // Émet l'événement pour démarrer l'édition
+      this.$nextTick(() => {
+        this.$el.querySelector("input").focus();
+      });
+    },
+    saveEventName() {
+      if (this.editedName.trim() !== "") {
+        this.$emit("updateEventName", this.editedName);
+      }
+      this.isEditing = false;
+      this.$emit("editingStatus", false); // Émet l'événement pour terminer l'édition
+    },
+    cancelEdit() {
+      this.isEditing = false;
+      this.editedName = this.event.name;
+      this.$emit("editingStatus", false); // Émet l'événement pour terminer l'édition
     },
     blockStyle(block) {
       const startPercent = ((block.start - this.scrollOffset) / this.visibleDuration) * 100;
@@ -88,6 +121,14 @@ export default {
 .event-name {
   color: white;
   font-weight: bold;
+}
+.event-name-input {
+  width: 100%;
+  padding: 4px;
+  background-color: #333;
+  color: white;
+  border: 1px solid #555;
+  border-radius: 4px;
 }
 .event-block {
   position: absolute;

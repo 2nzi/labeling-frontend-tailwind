@@ -2,9 +2,8 @@
   <div
     class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg"
     @wheel="handleWheel"
-    @click="deselectAll"
-    @keydown.delete="deleteSelectedElement"
-    @keydown.a="addBlockToSelectedEvent"
+    @keydown.delete="handleDeleteKey"
+    @keydown.a="handleAKey"
     tabindex="0"
   >
     <!-- Contrôles de la timeline -->
@@ -19,7 +18,7 @@
     />
 
     <!-- Conteneur de la timeline -->
-    <div class="relative mt-4 w-full overflow-hidden">
+    <div class="relative mt-4 w-full overflow-hidden timeline-container" @click.stop="">
       <!-- Graduations -->
       <TimelineGraduation
         :duration="duration"
@@ -50,6 +49,8 @@
           @select="selectEvent(index)"
           @selectBlock="selectBlock"
           @updateBlockStart="updateBlockStart"
+          @editingStatus="updateEditingStatus"
+          @updateEventName="updateEventName"
         />
         <!-- Bouton d'ajout de ligne -->
         <div class="add-event-row" @click="addEvent">
@@ -93,6 +94,7 @@ export default {
       selectedEvent: null,
       selectedBlock: null,
       showConfirmation: false,
+      isEditingEventName: false,
       events: [
         { name: "Takeoff", blocks: [] },
         { name: "Carve", blocks: [] },
@@ -125,6 +127,21 @@ export default {
         }
       }, 10);
     },
+
+    handleKeyEvents(event) {
+      if (this.isEditingEventName) return;
+
+      if (event.key === "a") {
+        event.preventDefault();
+        this.addBlockToSelectedEvent();
+      } else if (event.key === " ") {
+        event.preventDefault();
+        this.togglePlayPause();
+      } else if (event.key === "Delete") {
+        this.deleteSelectedElement();
+      }
+    },
+
     deleteSelectedElement() {
       if (this.selectedBlock) {
         if (this.selectedEvent !== null && this.selectedEvent < this.events.length) {
@@ -161,6 +178,14 @@ export default {
       if (this.selectedEvent !== null) {
         this.events[this.selectedEvent].blocks[index].start = newStart;
       }
+    },
+    updateEventName(newName) {
+      if (this.selectedEvent !== null) {
+        this.events[this.selectedEvent].name = newName;
+      }
+    },
+    updateEditingStatus(isEditing) {
+      this.isEditingEventName = isEditing;
     },
     zoomIn() {
       this.updateZoom(this.visibleDuration * 0.95);
@@ -205,7 +230,8 @@ export default {
       this.currentTime = Math.min(this.duration, Math.max(0, time));
     },
     deselectAll(event) {
-      if (!event.target.closest('.timeline-event-row') && !event.target.closest('.event-block')) {
+      // Vérifie si le clic a eu lieu en dehors de .timeline-editor
+      if (!event.target.closest('.timeline-editor')) {
         this.selectedEvent = null;
         this.selectedBlock = null;
       }
@@ -223,8 +249,14 @@ export default {
       this.events.push({ name: newEventName, blocks: [] });
     },
   },
+  mounted() {
+    document.addEventListener("keydown", this.handleKeyEvents);
+    document.addEventListener("click", this.deselectAll); // Ajouté pour capturer les clics en dehors
+  },
   beforeUnmount() {
     clearInterval(this.playbackInterval);
+    document.removeEventListener("keydown", this.handleKeyEvents);
+    document.removeEventListener("click", this.deselectAll);
   },
 };
 </script>
@@ -232,6 +264,10 @@ export default {
 <style scoped>
 .timeline-editor {
   width: 65%;
+  position: relative;
+}
+.timeline-cursor {
+  z-index: 4;
 }
 .event-rows {
   background-color: #333;
