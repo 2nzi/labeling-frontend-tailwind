@@ -27,6 +27,18 @@
       @mousedown.stop.prevent="startDraggingBlock(index, $event)"
     >
       {{ block.name }}
+
+      <!-- Poignée de redimensionnement gauche -->
+      <div 
+        class="resize-handle left-handle" 
+        @mousedown.stop.prevent="startResizingLeft(index, $event)"
+      ></div>
+
+      <!-- Poignée de redimensionnement droite -->
+      <div 
+        class="resize-handle right-handle" 
+        @mousedown.stop.prevent="startResizingRight(index, $event)"
+      ></div>
     </div>
   </div>
 </template>
@@ -39,10 +51,14 @@ export default {
       isEditing: false,
       editedName: this.event.name,
       draggingBlockIndex: null,
+      resizingBlockIndex: null,
       startX: 0,
       originalStart: 0,
+      originalDuration: 0,
+      resizingDirection: null, // 'left' ou 'right' pour savoir quel côté est redimensionné
     };
   },
+
   methods: {
     selectEvent() {
       if (!this.isEditing) {
@@ -52,7 +68,7 @@ export default {
     editEventName() {
       this.isEditing = true;
       this.editedName = this.event.name;
-      this.$emit("editingStatus", true); // Émet l'événement pour démarrer l'édition
+      this.$emit("editingStatus", true);
       this.$nextTick(() => {
         this.$el.querySelector("input").focus();
       });
@@ -62,12 +78,12 @@ export default {
         this.$emit("updateEventName", this.editedName);
       }
       this.isEditing = false;
-      this.$emit("editingStatus", false); // Émet l'événement pour terminer l'édition
+      this.$emit("editingStatus", false);
     },
     cancelEdit() {
       this.isEditing = false;
       this.editedName = this.event.name;
-      this.$emit("editingStatus", false); // Émet l'événement pour terminer l'édition
+      this.$emit("editingStatus", false);
     },
     blockStyle(block) {
       const startPercent = ((block.start - this.scrollOffset) / this.visibleDuration) * 100;
@@ -81,6 +97,7 @@ export default {
       this.$emit("selectBlock", block);
     },
     startDraggingBlock(index, event) {
+      this.$emit("selectBlock", this.event.blocks[index], this.event);
       this.draggingBlockIndex = index;
       this.startX = event.clientX;
       this.originalStart = this.event.blocks[index].start;
@@ -99,6 +116,58 @@ export default {
       this.draggingBlockIndex = null;
       document.removeEventListener("mousemove", this.dragBlock);
       document.removeEventListener("mouseup", this.stopDraggingBlock);
+    },
+
+    // Commence le redimensionnement depuis la gauche
+    startResizingLeft(index, event) {
+      this.resizingBlockIndex = index;
+      this.startX = event.clientX;
+      this.originalStart = this.event.blocks[index].start;
+      this.originalDuration = this.event.blocks[index].duration;
+      this.resizingDirection = 'left';
+      document.addEventListener("mousemove", this.resizeBlock);
+      document.addEventListener("mouseup", this.stopResizingBlock);
+    },
+
+    // Commence le redimensionnement depuis la droite
+    startResizingRight(index, event) {
+      this.resizingBlockIndex = index;
+      this.startX = event.clientX;
+      this.originalDuration = this.event.blocks[index].duration;
+      this.resizingDirection = 'right';
+      document.addEventListener("mousemove", this.resizeBlock);
+      document.addEventListener("mouseup", this.stopResizingBlock);
+    },
+
+    resizeBlock(event) {
+      if (this.resizingBlockIndex !== null) {
+        const dx = (event.clientX - this.startX) / this.$el.clientWidth;
+        const block = this.event.blocks[this.resizingBlockIndex];
+
+        if (this.resizingDirection === 'left') {
+          // Redimensionne depuis la gauche : ajuste la position de début et la durée
+          const newStart = Math.max(0, this.originalStart + dx * this.visibleDuration);
+          const newDuration = Math.max(0.5, this.originalDuration - dx * this.visibleDuration);
+          if (newDuration > 0.5) {
+            block.start = newStart;
+            block.duration = newDuration;
+            this.$emit("updateBlockStart", this.resizingBlockIndex, newStart);
+            this.$emit("updateBlockDuration", this.resizingBlockIndex, newDuration);
+          }
+        } else if (this.resizingDirection === 'right') {
+          // Redimensionne depuis la droite : ajuste seulement la durée
+          const newDuration = Math.max(0.5, this.originalDuration + dx * this.visibleDuration);
+          block.duration = newDuration;
+          this.$emit("updateBlockDuration", this.resizingBlockIndex, newDuration);
+        }
+      }
+    },
+
+    stopResizingBlock() {
+      this.resizingBlockIndex = null;
+      this.resizingDirection = null;
+      document.removeEventListener("mousemove", this.resizeBlock);
+      document.removeEventListener("mouseup", this.stopResizingBlock);
     },
   },
 };
@@ -146,5 +215,24 @@ export default {
 }
 .event-block.selected-block {
   border: 2px solid blue;
+}
+
+/* Poignées de redimensionnement */
+.resize-handle {
+  position: absolute;
+  width: 5px;
+  height: 100%;
+  cursor: ew-resize;
+  background-color: #ffffff66;
+}
+
+.left-handle {
+  left: 0;
+  cursor: w-resize;
+}
+
+.right-handle {
+  right: 0;
+  cursor: e-resize;
 }
 </style>

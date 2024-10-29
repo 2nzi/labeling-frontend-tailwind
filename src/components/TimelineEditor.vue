@@ -14,9 +14,11 @@
       @zoomIn="zoomIn" 
       @zoomOut="zoomOut" 
       @scrollLeft="scrollLeft" 
-      @scrollRight="scrollRight" 
+      @scrollRight="scrollRight"
+      @sportSelected="loadSportConfiguration"
     />
 
+    
     <!-- Conteneur de la timeline -->
     <div class="relative mt-4 w-full overflow-hidden timeline-container" @click.stop="">
       <!-- Graduations -->
@@ -51,6 +53,7 @@
           @updateBlockStart="updateBlockStart"
           @editingStatus="updateEditingStatus"
           @updateEventName="updateEventName"
+          @updateBlockDuration="updateBlockDuration"
         />
         <!-- Bouton d'ajout de ligne -->
         <div class="add-event-row" @click="addEvent">
@@ -75,6 +78,7 @@ import TimelineGraduation from './TimelineGraduation.vue';
 import TimelineCursor from './TimelineCursor.vue';
 import TimelineEventRow from './TimelineEventRow.vue';
 import ConfirmationDialog from './ConfirmationDialog.vue';
+import sportsConfigurations from "@/assets/sportsConfigurations.js";
 
 export default {
   components: {
@@ -95,15 +99,18 @@ export default {
       selectedBlock: null,
       showConfirmation: false,
       isEditingEventName: false,
-      events: [
-        { name: "Takeoff", blocks: [] },
-        { name: "Carve", blocks: [] },
-        { name: "360", blocks: [] },
-        { name: "Roller", blocks: [] },
-      ],
+      events: [],
     };
   },
   methods: {
+    loadSportConfiguration(sport) {
+      if (sportsConfigurations[sport]) {
+        this.events = sportsConfigurations[sport].events.map(eventName => ({
+          name: eventName,
+          blocks: [],
+        }));
+      }
+    },
     togglePlayPause() {
       this.isPlaying = !this.isPlaying;
       if (this.isPlaying) {
@@ -240,18 +247,31 @@ export default {
       this.selectedEvent = index;
       this.selectedBlock = null;
     },
-    selectBlock(block) {
+    selectBlock(block, event) {
+      const eventIndex = this.events.indexOf(event);
+      if (eventIndex !== -1 && eventIndex !== this.selectedEvent) {
+        this.selectedEvent = eventIndex;
+      }
       this.selectedBlock = block;
-      this.selectedEvent = this.events.findIndex(event => event.blocks.includes(block));
     },
     addEvent() {
       const newEventName = `Event${this.events.length + 1}`;
       this.events.push({ name: newEventName, blocks: [] });
     },
+    updateBlockDuration(eventIndex, blockIndex, newDuration) {
+      if (eventIndex !== null && eventIndex < this.events.length) {
+        const event = this.events[eventIndex];
+        if (event.blocks && blockIndex < event.blocks.length) {
+          event.blocks[blockIndex].duration = newDuration;
+        }
+      }
+    },
+
   },
   mounted() {
     document.addEventListener("keydown", this.handleKeyEvents);
-    document.addEventListener("click", this.deselectAll); // Ajouté pour capturer les clics en dehors
+    document.addEventListener("click", this.deselectAll);
+    this.loadSportConfiguration("Surf"); // Charger par défaut la configuration "Surf"
   },
   beforeUnmount() {
     clearInterval(this.playbackInterval);
