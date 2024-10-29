@@ -1,6 +1,5 @@
 <template>
   <div class="editor-container">
-    <!-- Composant VideoPlayer en dehors de la timeline-editor -->
     <VideoPlayer
       ref="videoPlayer"
       :currentTime="currentTime"
@@ -19,7 +18,6 @@
       @keydown.a="handleAKey"
       tabindex="0"
     >
-      <!-- Contrôles de la timeline -->
       <TimelineControls 
         :isPlaying="isPlaying" 
         :currentTime="currentTime" 
@@ -32,9 +30,7 @@
         @sportSelected="loadSportConfiguration"
       />
 
-      <!-- Conteneur de la timeline -->
       <div class="relative mt-4 w-full overflow-hidden timeline-container" @click.stop="">
-        <!-- Graduations -->
         <TimelineGraduation
           :duration="duration"
           :visibleDuration="visibleDuration"
@@ -42,7 +38,6 @@
           @timeSelected="setCursorTime"
         />
 
-        <!-- Curseur de lecture avec tête -->
         <TimelineCursor
           :currentTime="currentTime"
           :duration="duration"
@@ -51,7 +46,6 @@
           :rowCount="events.length + 1"
         />
 
-        <!-- Lignes d'événements -->
         <div class="event-rows">
           <TimelineEventRow
             v-for="(event, index) in events"
@@ -61,23 +55,17 @@
             :selectedBlock="selectedBlock"
             :scrollOffset="scrollOffset"
             :visibleDuration="visibleDuration"
+            :duration="duration"
+            :isLastRow="index === events.length - 1"
             @select="selectEvent(index)"
             @selectBlock="selectBlock"
             @updateBlockStart="updateBlockStart"
             @editingStatus="updateEditingStatus"
             @updateEventName="updateEventName"
             @updateBlockDuration="updateBlockDuration"
+            @updateScrollOffset="updateScrollOffset"
+            @updateVisibleDuration="updateVisibleDuration"
           />
-
-          <div class="timeline-minimap">
-            <div
-              class="minimap-view"
-              :style="{
-                width: `${(visibleDuration / duration) * 100}%`,
-                left: `${(scrollOffset / duration) * 100}%`
-              }"
-            ></div>
-          </div>
 
           <!-- Bouton d'ajout de ligne -->
           <div class="add-event-row" @click="addEvent">
@@ -86,7 +74,6 @@
         </div>
       </div>
 
-      <!-- Boîte de dialogue de confirmation pour la suppression d'un événement -->
       <ConfirmationDialog
         :visible="showConfirmation"
         message="Êtes-vous sûr de vouloir supprimer cet événement ?"
@@ -98,7 +85,7 @@
 </template>
 
 <script>
-// Imports des composants
+// Import des composants nécessaires
 import TimelineControls from './TimelineControls.vue';
 import TimelineGraduation from './TimelineGraduation.vue';
 import TimelineCursor from './TimelineCursor.vue';
@@ -220,6 +207,12 @@ export default {
           duration: 3,
         });
       }
+    },
+    updateScrollOffset(newOffset) {
+      this.scrollOffset = newOffset;
+    },
+    updateVisibleDuration(newDuration) {
+      this.visibleDuration = newDuration;
     },
     updateBlockStart(index, newStart) {
       if (this.selectedEvent !== null) {
@@ -366,22 +359,5 @@ export default {
   justify-content: center;
 }
 
-/* Minimap de navigation */
-.timeline-minimap {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  height: 8px;
-  background-color: #333;
-  margin-top: 5px;
-}
-
-.minimap-view {
-  position: absolute;
-  height: 100%;
-  background-color: #4CAF50; /* couleur de la barre */
-  opacity: 0.7;
-  border-radius: 4px;
-}
 
 </style>

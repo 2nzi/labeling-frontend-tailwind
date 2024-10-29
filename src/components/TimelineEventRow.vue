@@ -1,20 +1,5 @@
 <template>
-  <div
-    class="timeline-event-row"
-      :class="{ 'selected-row': isSelected }"
-      @click="selectEvent"
-    >
-
-    <div class="timeline-minimap">
-      <div
-        class="minimap-view"
-        :style="{
-          width: `${(visibleDuration / duration) * 100}%`,
-          left: `${(scrollOffset / duration) * 100}%`
-        }"
-      ></div>
-    </div>
-
+  <div class="timeline-event-row" :class="{ 'selected-row': isSelected }" @click="selectEvent">
     <!-- Nom de l'événement -->
     <span v-if="!isEditing" class="event-name" @dblclick="editEventName">{{ event.name }}</span>
     <input
@@ -40,36 +25,56 @@
       {{ block.name }}
 
       <!-- Poignée de redimensionnement gauche -->
-      <div 
-        class="resize-handle left-handle" 
+      <div
+        class="resize-handle left-handle"
         @mousedown.stop.prevent="startResizingLeft(index, $event)"
       ></div>
 
       <!-- Poignée de redimensionnement droite -->
-      <div 
-        class="resize-handle right-handle" 
+      <div
+        class="resize-handle right-handle"
         @mousedown.stop.prevent="startResizingRight(index, $event)"
       ></div>
+    </div>
+
+    <!-- Barre de navigation (minimap) ajoutée uniquement à la dernière ligne d'événement -->
+    <div v-if="isLastRow" class="timeline-minimap">
+      <div
+        class="minimap-view"
+        :style="{
+          width: `${(visibleDuration / duration) * 100}%`,
+          left: `${(scrollOffset / duration) * 100}%`
+        }"
+        @mousedown="startDraggingMinimap"
+      >
+        <!-- Poignées de la minimap -->
+        <div
+          class="minimap-handle left-handle"
+          @mousedown.stop.prevent="startResizingMinimapLeft"
+        ></div>
+        <div
+          class="minimap-handle right-handle"
+          @mousedown.stop.prevent="startResizingMinimapRight"
+        ></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  props: ["event", "isSelected", "selectedBlock", "scrollOffset", "visibleDuration"],
+  props: ["event", "isSelected", "selectedBlock", "scrollOffset", "visibleDuration", "duration", "isLastRow"],
   data() {
     return {
       isEditing: false,
       editedName: this.event.name,
-      draggingBlockIndex: null,
-      resizingBlockIndex: null,
+      draggingMinimap: false,
+      resizingMinimapDirection: null, // 'left' ou 'right' pour savoir quel côté est redimensionné
       startX: 0,
-      originalStart: 0,
+      originalOffset: 0,
       originalDuration: 0,
-      resizingDirection: null, // 'left' ou 'right' pour savoir quel côté est redimensionné
     };
   },
-
   methods: {
     selectEvent() {
       if (!this.isEditing) {
@@ -104,81 +109,59 @@ export default {
         width: `${widthPercent}%`,
       };
     },
-    selectBlock(block) {
-      this.$emit("selectBlock", block);
-    },
-    startDraggingBlock(index, event) {
-      this.$emit("selectBlock", this.event.blocks[index], this.event);
-      this.draggingBlockIndex = index;
+    startDraggingMinimap(event) {
+      this.draggingMinimap = true;
       this.startX = event.clientX;
-      this.originalStart = this.event.blocks[index].start;
-      document.addEventListener("mousemove", this.dragBlock);
-      document.addEventListener("mouseup", this.stopDraggingBlock);
+      this.originalOffset = this.scrollOffset;
+      document.addEventListener("mousemove", this.dragMinimap);
+      document.addEventListener("mouseup", this.stopDraggingMinimap);
     },
-    dragBlock(event) {
-      if (this.draggingBlockIndex !== null) {
-        const dx = (event.clientX - this.startX) / this.$el.clientWidth;
-        const newStart = Math.max(0, this.originalStart + dx * this.visibleDuration);
-        const maxStart = this.$parent.duration - this.event.blocks[this.draggingBlockIndex].duration;
-        this.$emit("updateBlockStart", this.draggingBlockIndex, Math.min(maxStart, newStart));
+    dragMinimap(event) {
+      if (this.draggingMinimap) {
+        const dx = ((event.clientX - this.startX) / this.$el.clientWidth) * this.duration;
+        this.$emit("updateScrollOffset", Math.min(this.duration - this.visibleDuration, Math.max(0, this.originalOffset + dx)));
       }
     },
-    stopDraggingBlock() {
-      this.draggingBlockIndex = null;
-      document.removeEventListener("mousemove", this.dragBlock);
-      document.removeEventListener("mouseup", this.stopDraggingBlock);
+    stopDraggingMinimap() {
+      this.draggingMinimap = false;
+      document.removeEventListener("mousemove", this.dragMinimap);
+      document.removeEventListener("mouseup", this.stopDraggingMinimap);
     },
-
-    // Commence le redimensionnement depuis la gauche
-    startResizingLeft(index, event) {
-      this.resizingBlockIndex = index;
+    startResizingMinimapLeft(event) {
+      this.resizingMinimapDirection = "left";
       this.startX = event.clientX;
-      this.originalStart = this.event.blocks[index].start;
-      this.originalDuration = this.event.blocks[index].duration;
-      this.resizingDirection = 'left';
-      document.addEventListener("mousemove", this.resizeBlock);
-      document.addEventListener("mouseup", this.stopResizingBlock);
+      this.originalOffset = this.scrollOffset;
+      this.originalDuration = this.visibleDuration;
+      document.addEventListener("mousemove", this.resizeMinimap);
+      document.addEventListener("mouseup", this.stopResizingMinimap);
     },
-
-    // Commence le redimensionnement depuis la droite
-    startResizingRight(index, event) {
-      this.resizingBlockIndex = index;
+    startResizingMinimapRight(event) {
+      this.resizingMinimapDirection = "right";
       this.startX = event.clientX;
-      this.originalDuration = this.event.blocks[index].duration;
-      this.resizingDirection = 'right';
-      document.addEventListener("mousemove", this.resizeBlock);
-      document.addEventListener("mouseup", this.stopResizingBlock);
+      this.originalDuration = this.visibleDuration;
+      document.addEventListener("mousemove", this.resizeMinimap);
+      document.addEventListener("mouseup", this.stopResizingMinimap);
     },
-
-    resizeBlock(event) {
-      if (this.resizingBlockIndex !== null) {
-        const dx = (event.clientX - this.startX) / this.$el.clientWidth;
-        const block = this.event.blocks[this.resizingBlockIndex];
-
-        if (this.resizingDirection === 'left') {
-          // Redimensionne depuis la gauche : ajuste la position de début et la durée
-          const newStart = Math.max(0, this.originalStart + dx * this.visibleDuration);
-          const newDuration = Math.max(0.5, this.originalDuration - dx * this.visibleDuration);
-          if (newDuration > 0.5) {
-            block.start = newStart;
-            block.duration = newDuration;
-            this.$emit("updateBlockStart", this.resizingBlockIndex, newStart);
-            this.$emit("updateBlockDuration", this.resizingBlockIndex, newDuration);
-          }
-        } else if (this.resizingDirection === 'right') {
-          // Redimensionne depuis la droite : ajuste seulement la durée
-          const newDuration = Math.max(0.5, this.originalDuration + dx * this.visibleDuration);
-          block.duration = newDuration;
-          this.$emit("updateBlockDuration", this.resizingBlockIndex, newDuration);
+    resizeMinimap(event) {
+      const dx = ((event.clientX - this.startX) / this.$el.clientWidth) * this.duration;
+      if (this.resizingMinimapDirection === "left") {
+        const newOffset = Math.max(0, this.originalOffset + dx);
+        const newDuration = Math.max(1, this.originalDuration - dx);
+        if (newOffset + newDuration <= this.duration) {
+          this.$emit("updateScrollOffset", newOffset);
+          this.$emit("updateVisibleDuration", newDuration);
+        }
+      } else if (this.resizingMinimapDirection === "right") {
+        const newDuration = Math.max(1, this.originalDuration + dx);
+        if (this.scrollOffset + newDuration <= this.duration) {
+          this.$emit("updateVisibleDuration", newDuration);
         }
       }
     },
-
-    stopResizingBlock() {
-      this.resizingBlockIndex = null;
-      this.resizingDirection = null;
-      document.removeEventListener("mousemove", this.resizeBlock);
-      document.removeEventListener("mouseup", this.stopResizingBlock);
+    stopResizingMinimap() {
+      this.resizingMinimapDirection = null;
+      document.removeEventListener("mousemove", this.resizeMinimap);
+      document.removeEventListener("mouseup", this.stopResizingMinimap);
     },
   },
 };
@@ -247,5 +230,43 @@ export default {
   cursor: e-resize;
 }
 
+/* Minimap de navigation */
+.timeline-minimap {
+  position: absolute;
+  bottom: -10px;
+  width: 100%;
+  height: 8px;
+  background-color: #333;
+  margin-top: 5px;
+  margin-left: -10px;
+}
 
+.minimap-view {
+  position: absolute;
+  height: 100%;
+  background-color: #989898;
+  opacity: 0.7;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+/* Poignées de la minimap */
+.minimap-handle {
+  width: 8px;
+  height: 100%;
+  background-color: #ccc;
+  border-radius: 50%;
+  border: 2px solid #555;
+}
+
+.left-handle {
+  position: absolute;
+  left: 0;
+}
+
+.right-handle {
+  position: absolute;
+  right: 0;
+}
 </style>

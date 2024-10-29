@@ -30,20 +30,23 @@ export default {
   position: absolute;
   top: 30px; /* Décalage correspondant à la hauteur des graduations */
   height: calc(100% - 30px); /* Ajustement de la hauteur pour couvrir les lignes sans empiéter sur les graduations */
-  width: 2px;
-  background-color: blue;
+  width: 4px;
+  background-color: #0665CC;
   z-index: 3; /* Toujours au-dessus des autres éléments */
 }
 
 .cursor-head {
-  width: 10px;
-  height: 10px;
-  background-color: blue;
-  border-radius: 50%;
+  content: "";
   position: absolute;
-  top: -5px;
-  left: -4px;
+  top: 0;
+  left: -2px;
+  width: 8px;
+  height: 10px;
+  background-color: #0665CC;
+  border-radius: 0 0 4px 4px;
+  transform: scaleX(1.4);
 }
+
 
 .cursor-line {
   position: absolute;
