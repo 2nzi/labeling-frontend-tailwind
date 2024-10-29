@@ -28,8 +28,8 @@ export default {
 <style scoped>
 .timeline-cursor {
   position: absolute;
-  top: 20px; /* Décalage correspondant à la hauteur des graduations */
-  height: calc(100% - 20px); /* Ajustement de la hauteur pour couvrir les lignes sans empiéter sur les graduations */
+  top: 30px; /* Décalage correspondant à la hauteur des graduations */
+  height: calc(100% - 30px); /* Ajustement de la hauteur pour couvrir les lignes sans empiéter sur les graduations */
   width: 2px;
   background-color: blue;
   z-index: 3; /* Toujours au-dessus des autres éléments */

@@ -1,9 +1,20 @@
 <template>
   <div
     class="timeline-event-row"
-    :class="{ 'selected-row': isSelected }"
-    @click="selectEvent"
-  >
+      :class="{ 'selected-row': isSelected }"
+      @click="selectEvent"
+    >
+
+    <div class="timeline-minimap">
+      <div
+        class="minimap-view"
+        :style="{
+          width: `${(visibleDuration / duration) * 100}%`,
+          left: `${(scrollOffset / duration) * 100}%`
+        }"
+      ></div>
+    </div>
+
     <!-- Nom de l'événement -->
     <span v-if="!isEditing" class="event-name" @dblclick="editEventName">{{ event.name }}</span>
     <input
@@ -235,4 +246,6 @@ export default {
   right: 0;
   cursor: e-resize;
 }
+
+
 </style>

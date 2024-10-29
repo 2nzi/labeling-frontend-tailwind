@@ -7,10 +7,12 @@
         <PlayIcon v-else class="icon-size" />
       </button>
       <span class="time-display">{{ formatTime(currentTime) }}</span>
-      <button @click="$emit('zoomIn')" class="control-button">+</button>
-      <button @click="$emit('zoomOut')" class="control-button">-</button>
-      <button @click="$emit('scrollLeft')" class="control-button">←</button>
-      <button @click="$emit('scrollRight')" class="control-button">→</button>
+      <div class="flex items-center space-x-2 justify-between">
+        <button @click="$emit('zoomIn')" class="control-button">+</button>
+        <button @click="$emit('zoomOut')" class="control-button">-</button>
+        <button @click="$emit('scrollLeft')" class="control-button">←</button>
+        <button @click="$emit('scrollRight')" class="control-button">→</button>
+      </div>
     </div>
     
     <!-- Section de sélection du sport -->
@@ -60,7 +62,6 @@ export default {
 }
 
 .icon-button {
-  background-color: #555;
   border: none;
   padding: 4px;
   border-radius: 4px;
@@ -75,13 +76,14 @@ export default {
 }
 
 .control-button {
-  background-color: #555;
+  background-color:#464646;
   color: white;
   padding: 4px 6px;
-  border: none;
+  border: 3px solid #555; /* Contour de 2px avec couleur et style */
   border-radius: 4px;
   font-size: 14px;
 }
+
 
 .time-display {
   font-size: 14px;
@@ -89,11 +91,12 @@ export default {
 }
 
 .sport-select {
-  background-color: #333;
+  background-color: #464646;
   color: white;
   padding: 4px 8px;
-  border: none;
+  border: 3px solid #555; /* Définir l'épaisseur, le style, et la couleur de la bordure */
   border-radius: 4px;
   font-size: 0.9em;
 }
+
 </style>

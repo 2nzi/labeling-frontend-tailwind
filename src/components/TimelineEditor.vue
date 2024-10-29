@@ -1,12 +1,6 @@
 <template>
-  <div
-    class="timeline-editor mx-auto bg-gray-800 text-white p-4 rounded-lg"
-    @wheel="handleWheel"
-    @keydown.delete="handleDeleteKey"
-    @keydown.a="handleAKey"
-    tabindex="0"
-  >
-    <!-- Lecteur de vidéo -->
+  <div class="editor-container">
+    <!-- Composant VideoPlayer en dehors de la timeline-editor -->
     <VideoPlayer
       ref="videoPlayer"
       :currentTime="currentTime"
@@ -17,73 +11,94 @@
       @videoDuration="updateDurationFromVideo"
     />
 
-    <!-- Contrôles de la timeline -->
-    <TimelineControls 
-      :isPlaying="isPlaying" 
-      :currentTime="currentTime" 
-      :isVideoLoaded="isVideoLoaded"
-      @togglePlayPause="togglePlayPause" 
-      @zoomIn="zoomIn" 
-      @zoomOut="zoomOut" 
-      @scrollLeft="scrollLeft" 
-      @scrollRight="scrollRight"
-      @sportSelected="loadSportConfiguration"
-    />
-
     <!-- Conteneur de la timeline -->
-    <div class="relative mt-4 w-full overflow-hidden timeline-container" @click.stop="">
-      <!-- Graduations -->
-      <TimelineGraduation
-        :duration="duration"
-        :visibleDuration="visibleDuration"
-        :scrollOffset="scrollOffset"
-        @timeSelected="setCursorTime"
+    <div
+      class="timeline-editor mx-auto bg-[#464646] text-white p-4 rounded-lg mt-4"
+      @wheel="handleWheel"
+      @keydown.delete="handleDeleteKey"
+      @keydown.a="handleAKey"
+      tabindex="0"
+    >
+      <!-- Contrôles de la timeline -->
+      <TimelineControls 
+        :isPlaying="isPlaying" 
+        :currentTime="currentTime" 
+        :isVideoLoaded="isVideoLoaded"
+        @togglePlayPause="togglePlayPause" 
+        @zoomIn="zoomIn" 
+        @zoomOut="zoomOut" 
+        @scrollLeft="scrollLeft" 
+        @scrollRight="scrollRight"
+        @sportSelected="loadSportConfiguration"
       />
 
-      <!-- Curseur de lecture avec tête -->
-      <TimelineCursor
-        :currentTime="currentTime"
-        :duration="duration"
-        :visibleDuration="visibleDuration"
-        :scrollOffset="scrollOffset"
-        :rowCount="events.length + 1"
-      />
-
-      <!-- Lignes d'événements -->
-      <div class="event-rows">
-        <TimelineEventRow
-          v-for="(event, index) in events"
-          :key="index"
-          :event="event"
-          :isSelected="selectedEvent === index"
-          :selectedBlock="selectedBlock"
-          :scrollOffset="scrollOffset"
+      <!-- Conteneur de la timeline -->
+      <div class="relative mt-4 w-full overflow-hidden timeline-container" @click.stop="">
+        <!-- Graduations -->
+        <TimelineGraduation
+          :duration="duration"
           :visibleDuration="visibleDuration"
-          @select="selectEvent(index)"
-          @selectBlock="selectBlock"
-          @updateBlockStart="updateBlockStart"
-          @editingStatus="updateEditingStatus"
-          @updateEventName="updateEventName"
-          @updateBlockDuration="updateBlockDuration"
+          :scrollOffset="scrollOffset"
+          @timeSelected="setCursorTime"
         />
-        <!-- Bouton d'ajout de ligne -->
-        <div class="add-event-row" @click="addEvent">
-          + Ajouter un événement
+
+        <!-- Curseur de lecture avec tête -->
+        <TimelineCursor
+          :currentTime="currentTime"
+          :duration="duration"
+          :visibleDuration="visibleDuration"
+          :scrollOffset="scrollOffset"
+          :rowCount="events.length + 1"
+        />
+
+        <!-- Lignes d'événements -->
+        <div class="event-rows">
+          <TimelineEventRow
+            v-for="(event, index) in events"
+            :key="index"
+            :event="event"
+            :isSelected="selectedEvent === index"
+            :selectedBlock="selectedBlock"
+            :scrollOffset="scrollOffset"
+            :visibleDuration="visibleDuration"
+            @select="selectEvent(index)"
+            @selectBlock="selectBlock"
+            @updateBlockStart="updateBlockStart"
+            @editingStatus="updateEditingStatus"
+            @updateEventName="updateEventName"
+            @updateBlockDuration="updateBlockDuration"
+          />
+
+          <div class="timeline-minimap">
+            <div
+              class="minimap-view"
+              :style="{
+                width: `${(visibleDuration / duration) * 100}%`,
+                left: `${(scrollOffset / duration) * 100}%`
+              }"
+            ></div>
+          </div>
+
+          <!-- Bouton d'ajout de ligne -->
+          <div class="add-event-row" @click="addEvent">
+            + Ajouter un événement
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Boîte de dialogue de confirmation pour la suppression d'un événement -->
-    <ConfirmationDialog
-      :visible="showConfirmation"
-      message="Êtes-vous sûr de vouloir supprimer cet événement ?"
-      @confirm="deleteSelectedEvent"
-      @cancel="showConfirmation = false"
-    />
+      <!-- Boîte de dialogue de confirmation pour la suppression d'un événement -->
+      <ConfirmationDialog
+        :visible="showConfirmation"
+        message="Êtes-vous sûr de vouloir supprimer cet événement ?"
+        @confirm="deleteSelectedEvent"
+        @cancel="showConfirmation = false"
+      />
+    </div>
   </div>
 </template>
 
 <script>
+// Imports des composants
 import TimelineControls from './TimelineControls.vue';
 import TimelineGraduation from './TimelineGraduation.vue';
 import TimelineCursor from './TimelineCursor.vue';
@@ -140,9 +155,7 @@ export default {
     startAnimation() {
       const animateCursor = () => {
         if (this.$refs.videoPlayer && this.isPlaying) {
-          // Synchronise `currentTime` avec la position de la vidéo
           this.currentTime = this.$refs.videoPlayer.$refs.video.currentTime;
-          // Demande la prochaine image pour rendre le mouvement fluide
           this.animationFrameId = requestAnimationFrame(animateCursor);
         }
       };
@@ -299,7 +312,7 @@ export default {
     this.loadSportConfiguration("Surf");
   },
   beforeUnmount() {
-    this.stopAnimation(); // Nettoie l'animation lors du démontage
+    this.stopAnimation();
     document.removeEventListener("keydown", this.handleKeyEvents);
     document.removeEventListener("click", this.deselectAll);
   },
@@ -307,15 +320,20 @@ export default {
 </script>
 
 <style scoped>
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .timeline-editor {
-  width: 65%;
-  position: relative;
+  width: 100%;
+  max-width: 800px;
 }
 .timeline-cursor {
   z-index: 4;
 }
 .event-rows {
-  background-color: #333;
+  background-color: #202020;
 }
 .add-event-row {
   background-color: #444;
@@ -329,4 +347,41 @@ export default {
   background-color: #555;
   color: #fff;
 }
+
+.timeline-graduation {
+  position: relative;
+  height: 30px;
+  background-color: #202020;
+  border-bottom: 3px solid #555;
+}
+
+.graduation-mark {
+  position: absolute;
+  color: #ccc;
+  font-size: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Minimap de navigation */
+.timeline-minimap {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 8px;
+  background-color: #333;
+  margin-top: 5px;
+}
+
+.minimap-view {
+  position: absolute;
+  height: 100%;
+  background-color: #4CAF50; /* couleur de la barre */
+  opacity: 0.7;
+  border-radius: 4px;
+}
+
 </style>
