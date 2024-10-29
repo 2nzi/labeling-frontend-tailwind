@@ -6,10 +6,22 @@
     @keydown.a="handleAKey"
     tabindex="0"
   >
+    <!-- Lecteur de vidéo -->
+    <VideoPlayer
+      ref="videoPlayer"
+      :currentTime="currentTime"
+      :isPlaying="isPlaying"
+      @updateCurrentTime="syncTimelineWithVideo"
+      @togglePlayPause="togglePlayPause"
+      @videoUploaded="handleVideoUploaded"
+      @videoDuration="updateDurationFromVideo"
+    />
+
     <!-- Contrôles de la timeline -->
     <TimelineControls 
       :isPlaying="isPlaying" 
       :currentTime="currentTime" 
+      :isVideoLoaded="isVideoLoaded"
       @togglePlayPause="togglePlayPause" 
       @zoomIn="zoomIn" 
       @zoomOut="zoomOut" 
@@ -18,7 +30,6 @@
       @sportSelected="loadSportConfiguration"
     />
 
-    
     <!-- Conteneur de la timeline -->
     <div class="relative mt-4 w-full overflow-hidden timeline-container" @click.stop="">
       <!-- Graduations -->
@@ -78,6 +89,7 @@ import TimelineGraduation from './TimelineGraduation.vue';
 import TimelineCursor from './TimelineCursor.vue';
 import TimelineEventRow from './TimelineEventRow.vue';
 import ConfirmationDialog from './ConfirmationDialog.vue';
+import VideoPlayer from './VideoPlayer.vue';
 import sportsConfigurations from "@/assets/sportsConfigurations.js";
 
 export default {
@@ -87,6 +99,7 @@ export default {
     TimelineCursor,
     TimelineEventRow,
     ConfirmationDialog,
+    VideoPlayer,
   },
   data() {
     return {
@@ -99,6 +112,8 @@ export default {
       selectedBlock: null,
       showConfirmation: false,
       isEditingEventName: false,
+      isVideoLoaded: false,
+      animationFrameId: null,
       events: [],
     };
   },
@@ -112,29 +127,42 @@ export default {
       }
     },
     togglePlayPause() {
-      this.isPlaying = !this.isPlaying;
-      if (this.isPlaying) {
-        this.startPlayback();
-      } else {
-        clearInterval(this.playbackInterval);
+      if (this.isVideoLoaded) {
+        this.isPlaying = !this.isPlaying;
+        this.$refs.videoPlayer.togglePlayback();
+        if (this.isPlaying) {
+          this.startAnimation();
+        } else {
+          this.stopAnimation();
+        }
       }
     },
-    startPlayback() {
-      this.playbackInterval = setInterval(() => {
-        if (this.currentTime >= this.duration) {
-          this.currentTime = 0;
-        } else {
-          this.currentTime += 0.01;
+    startAnimation() {
+      const animateCursor = () => {
+        if (this.$refs.videoPlayer && this.isPlaying) {
+          // Synchronise `currentTime` avec la position de la vidéo
+          this.currentTime = this.$refs.videoPlayer.$refs.video.currentTime;
+          // Demande la prochaine image pour rendre le mouvement fluide
+          this.animationFrameId = requestAnimationFrame(animateCursor);
         }
-        const cursorPosition = this.currentTime;
-        const endVisibleTime = this.scrollOffset + this.visibleDuration;
-
-        if (cursorPosition > endVisibleTime) {
-          this.scrollOffset = cursorPosition - this.visibleDuration + 1;
-        }
-      }, 10);
+      };
+      this.animationFrameId = requestAnimationFrame(animateCursor);
     },
-
+    stopAnimation() {
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
+    },
+    updateDurationFromVideo(videoDuration) {
+      this.duration = videoDuration;
+    },
+    syncTimelineWithVideo(time) {
+      this.currentTime = time;
+    },
+    handleVideoUploaded() {
+      this.isVideoLoaded = true;
+    },
     handleKeyEvents(event) {
       if (this.isEditingEventName) return;
 
@@ -148,7 +176,6 @@ export default {
         this.deleteSelectedElement();
       }
     },
-
     deleteSelectedElement() {
       if (this.selectedBlock) {
         if (this.selectedEvent !== null && this.selectedEvent < this.events.length) {
@@ -237,7 +264,6 @@ export default {
       this.currentTime = Math.min(this.duration, Math.max(0, time));
     },
     deselectAll(event) {
-      // Vérifie si le clic a eu lieu en dehors de .timeline-editor
       if (!event.target.closest('.timeline-editor')) {
         this.selectedEvent = null;
         this.selectedBlock = null;
@@ -266,15 +292,14 @@ export default {
         }
       }
     },
-
   },
   mounted() {
     document.addEventListener("keydown", this.handleKeyEvents);
     document.addEventListener("click", this.deselectAll);
-    this.loadSportConfiguration("Surf"); // Charger par défaut la configuration "Surf"
+    this.loadSportConfiguration("Surf");
   },
   beforeUnmount() {
-    clearInterval(this.playbackInterval);
+    this.stopAnimation(); // Nettoie l'animation lors du démontage
     document.removeEventListener("keydown", this.handleKeyEvents);
     document.removeEventListener("click", this.deselectAll);
   },
