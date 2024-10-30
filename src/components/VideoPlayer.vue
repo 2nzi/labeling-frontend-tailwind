@@ -89,7 +89,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 80%;
+  min-width: 350px;
   height: 450px;
   background: #CCCCCC;
   cursor: pointer;

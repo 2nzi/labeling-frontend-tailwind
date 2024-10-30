@@ -10,7 +10,6 @@
       @videoDuration="updateDurationFromVideo"
     />
 
-    <!-- Conteneur de la timeline -->
     <div
       class="timeline-editor mx-auto bg-[#464646] text-white p-4 rounded-lg mt-4"
       @wheel="handleWheel"
@@ -66,11 +65,7 @@
             @updateScrollOffset="updateScrollOffset"
             @updateVisibleDuration="updateVisibleDuration"
           />
-
-          <!-- Bouton d'ajout de ligne -->
-          <div class="add-event-row" @click="addEvent">
-            +
-          </div>
+          <div class="add-event-row" @click="addEvent">+</div>
         </div>
       </div>
 
@@ -85,7 +80,6 @@
 </template>
 
 <script>
-// Import des composants nécessaires
 import TimelineControls from './TimelineControls.vue';
 import TimelineGraduation from './TimelineGraduation.vue';
 import TimelineCursor from './TimelineCursor.vue';
@@ -128,6 +122,20 @@ export default {
         }));
       }
     },
+    getEventsForExport() {
+      return this.events.map(event => ({
+        event: event.name,
+        blocks: event.blocks.map(block => {
+          const start = Number(block.start);
+          const end = start + Number(block.duration);
+          return {
+            id: block.name,
+            start: start,
+            end: end,
+          };
+        })
+      }));
+    },
     togglePlayPause() {
       if (this.isVideoLoaded) {
         this.isPlaying = !this.isPlaying;
@@ -162,29 +170,53 @@ export default {
     },
     handleVideoUploaded() {
       this.isVideoLoaded = true;
+      this.$emit('videoUploaded');
     },
+    // handleKeyEvents(event) {
+    //   if (this.isEditingEventName) return;
+    //   if (event.key === "a") {
+    //     event.preventDefault();
+    //     this.addBlockToSelectedEvent();
+    //   } else if (event.key === " ") {
+    //     event.preventDefault();
+    //     this.togglePlayPause();
+    //   } else if (event.key === "Delete") {
+    //     this.deleteSelectedElement();
+    //   }
+    // },
+    addBlockToEvent(eventIndex) {
+    if (eventIndex >= 0 && eventIndex < this.events.length) {
+      const event = this.events[eventIndex];
+      const blockIndex = event.blocks.length + 1;
+      event.blocks.push({
+        name: `${event.name}_${blockIndex}`,
+        start: this.currentTime,
+        duration: 3,
+      });
+    }
+  },
     handleKeyEvents(event) {
-      if (this.isEditingEventName) return;
+    if (this.isEditingEventName) return;
 
-      if (event.key === "a") {
-        event.preventDefault();
-        this.addBlockToSelectedEvent();
-      } else if (event.key === " ") {
-        event.preventDefault();
-        this.togglePlayPause();
-      } else if (event.key === "Delete") {
-        this.deleteSelectedElement();
-      }
-    },
+    // Gérer les raccourcis numériques pour ajouter des blocs d'événements
+    const eventIndex = parseInt(event.key, 10) - 1; // Convertit la touche '1' en 0, '2' en 1, etc.
+    if (!isNaN(eventIndex) && eventIndex >= 0 && eventIndex < this.events.length) {
+      event.preventDefault();
+      this.addBlockToEvent(eventIndex);
+    } else if (event.key === " ") {
+      event.preventDefault();
+      this.togglePlayPause();
+    } else if (event.key === "Delete") {
+      this.deleteSelectedElement();
+    }
+  },
     deleteSelectedElement() {
       if (this.selectedBlock) {
-        if (this.selectedEvent !== null && this.selectedEvent < this.events.length) {
-          const event = this.events[this.selectedEvent];
-          const blockIndex = event.blocks.indexOf(this.selectedBlock);
-          if (blockIndex !== -1) {
-            event.blocks.splice(blockIndex, 1);
-            this.selectedBlock = null;
-          }
+        const event = this.events[this.selectedEvent];
+        const blockIndex = event.blocks.indexOf(this.selectedBlock);
+        if (blockIndex !== -1) {
+          event.blocks.splice(blockIndex, 1);
+          this.selectedBlock = null;
         }
       } else {
         this.showConfirmation = true;
@@ -215,10 +247,11 @@ export default {
       this.visibleDuration = newDuration;
     },
     updateBlockStart(eventIndex, blockIndex, newStart) {
-      if (this.events[eventIndex] && this.events[eventIndex].blocks[blockIndex]) {
-        this.events[eventIndex].blocks[blockIndex].start = newStart;
+      const event = this.events[eventIndex];
+      if (event && event.blocks[blockIndex]) {
+        event.blocks[blockIndex].start = newStart;
       } else {
-        console.warn("Le bloc ou l'événement est introuvable pour l'index donné.");
+        console.warn("Invalid event or block index.");
       }
     },
     updateEventName(newName) {
@@ -293,11 +326,9 @@ export default {
       this.events.push({ name: newEventName, blocks: [] });
     },
     updateBlockDuration(eventIndex, blockIndex, newDuration) {
-      if (eventIndex !== null && eventIndex < this.events.length) {
-        const event = this.events[eventIndex];
-        if (event.blocks && blockIndex < event.blocks.length) {
-          event.blocks[blockIndex].duration = newDuration;
-        }
+      const event = this.events[eventIndex];
+      if (event && event.blocks[blockIndex]) {
+        event.blocks[blockIndex].duration = newDuration;
       }
     },
   },
@@ -319,6 +350,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin-top: 50px;
 }
 .timeline-editor {
   width: 100%;
@@ -342,14 +374,12 @@ export default {
   background-color: #555;
   color: #fff;
 }
-
 .timeline-graduation {
   position: relative;
   height: 30px;
   background-color: #202020;
   border-bottom: 3px solid #555;
 }
-
 .graduation-mark {
   position: absolute;
   color: #ccc;
@@ -360,6 +390,4 @@ export default {
   align-items: center;
   justify-content: center;
 }
-
-
 </style>
