@@ -7,12 +7,6 @@
         <PlayIcon v-else class="icon-size" />
       </button>
       <span class="time-display">{{ formatTime(currentTime) }}</span>
-      <div class="flex items-center space-x-2 justify-between">
-        <button @click="$emit('zoomIn')" class="control-button">+</button>
-        <button @click="$emit('zoomOut')" class="control-button">-</button>
-        <button @click="$emit('scrollLeft')" class="control-button">←</button>
-        <button @click="$emit('scrollRight')" class="control-button">→</button>
-      </div>
     </div>
     
     <!-- Section de sélection du sport -->

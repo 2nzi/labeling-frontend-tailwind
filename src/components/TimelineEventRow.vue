@@ -19,7 +19,7 @@
       :style="blockStyle(block)"
       class="event-block"
       :class="{ 'selected-block': selectedBlock === block }"
-      @click.stop="selectBlock(block)"
+      @click.stop="handleSelectBlock(block)"
       @mousedown.stop.prevent="startDraggingBlock(index, $event)"
     >
       {{ block.name }}
@@ -109,59 +109,78 @@ export default {
         width: `${widthPercent}%`,
       };
     },
-    startDraggingMinimap(event) {
-      this.draggingMinimap = true;
-      this.startX = event.clientX;
-      this.originalOffset = this.scrollOffset;
-      document.addEventListener("mousemove", this.dragMinimap);
-      document.addEventListener("mouseup", this.stopDraggingMinimap);
+    handleSelectBlock(block) {
+      // Émet l'événement "selectBlock" avec le bloc sélectionné
+      this.$emit("selectBlock", block, this.event);
     },
-    dragMinimap(event) {
-      if (this.draggingMinimap) {
-        const dx = ((event.clientX - this.startX) / this.$el.clientWidth) * this.duration;
-        this.$emit("updateScrollOffset", Math.min(this.duration - this.visibleDuration, Math.max(0, this.originalOffset + dx)));
-      }
-    },
-    stopDraggingMinimap() {
-      this.draggingMinimap = false;
-      document.removeEventListener("mousemove", this.dragMinimap);
-      document.removeEventListener("mouseup", this.stopDraggingMinimap);
-    },
-    startResizingMinimapLeft(event) {
-      this.resizingMinimapDirection = "left";
-      this.startX = event.clientX;
-      this.originalOffset = this.scrollOffset;
-      this.originalDuration = this.visibleDuration;
-      document.addEventListener("mousemove", this.resizeMinimap);
-      document.addEventListener("mouseup", this.stopResizingMinimap);
-    },
-    startResizingMinimapRight(event) {
-      this.resizingMinimapDirection = "right";
-      this.startX = event.clientX;
-      this.originalDuration = this.visibleDuration;
-      document.addEventListener("mousemove", this.resizeMinimap);
-      document.addEventListener("mouseup", this.stopResizingMinimap);
-    },
-    resizeMinimap(event) {
-      const dx = ((event.clientX - this.startX) / this.$el.clientWidth) * this.duration;
-      if (this.resizingMinimapDirection === "left") {
-        const newOffset = Math.max(0, this.originalOffset + dx);
-        const newDuration = Math.max(1, this.originalDuration - dx);
-        if (newOffset + newDuration <= this.duration) {
-          this.$emit("updateScrollOffset", newOffset);
-          this.$emit("updateVisibleDuration", newDuration);
-        }
-      } else if (this.resizingMinimapDirection === "right") {
-        const newDuration = Math.max(1, this.originalDuration + dx);
-        if (this.scrollOffset + newDuration <= this.duration) {
-          this.$emit("updateVisibleDuration", newDuration);
+    startDraggingBlock(index, event) {
+    this.draggingBlockIndex = index;
+    this.startX = event.clientX;
+    this.originalStart = this.event.blocks[index].start;
+    this.$emit("selectBlock", this.event.blocks[index], this.event); // Émet l'événement de sélection de bloc avec l'événement actuel
+    document.addEventListener("mousemove", this.dragBlock);
+    document.addEventListener("mouseup", this.stopDraggingBlock);
+  },
+  dragBlock(event) {
+      if (this.draggingBlockIndex !== null) {
+        const dx = (event.clientX - this.startX) / this.$el.clientWidth;
+        const newStart = Math.max(0, this.originalStart + dx * this.visibleDuration);
+        const maxStart = this.$parent.duration - this.event.blocks[this.draggingBlockIndex].duration;
+        
+        // Envoie l'index de l'événement en plus de l'index du bloc pour éviter les erreurs
+        const eventIndex = this.$parent.events.indexOf(this.event);
+        if (eventIndex !== -1) {
+          this.$emit("updateBlockStart", eventIndex, this.draggingBlockIndex, Math.min(maxStart, newStart));
         }
       }
     },
-    stopResizingMinimap() {
-      this.resizingMinimapDirection = null;
-      document.removeEventListener("mousemove", this.resizeMinimap);
-      document.removeEventListener("mouseup", this.stopResizingMinimap);
+    stopDraggingBlock() {
+      this.draggingBlockIndex = null;
+      document.removeEventListener("mousemove", this.dragBlock);
+      document.removeEventListener("mouseup", this.stopDraggingBlock);
+    },
+    startResizingLeft(index, event) {
+      this.resizingBlockIndex = index;
+      this.startX = event.clientX;
+      this.originalStart = this.event.blocks[index].start;
+      this.originalDuration = this.event.blocks[index].duration;
+      this.resizingDirection = "left";
+      document.addEventListener("mousemove", this.resizeBlock);
+      document.addEventListener("mouseup", this.stopResizingBlock);
+    },
+    startResizingRight(index, event) {
+      this.resizingBlockIndex = index;
+      this.startX = event.clientX;
+      this.originalDuration = this.event.blocks[index].duration;
+      this.resizingDirection = "right";
+      document.addEventListener("mousemove", this.resizeBlock);
+      document.addEventListener("mouseup", this.stopResizingBlock);
+    },
+    resizeBlock(event) {
+      if (this.resizingBlockIndex !== null) {
+        const dx = (event.clientX - this.startX) / this.$el.clientWidth;
+        const block = this.event.blocks[this.resizingBlockIndex];
+        if (this.resizingDirection === "left") {
+          const newStart = Math.max(0, this.originalStart + dx * this.visibleDuration);
+          const newDuration = Math.max(0.5, this.originalDuration - dx * this.visibleDuration);
+          if (newDuration > 0.5) {
+            block.start = newStart;
+            block.duration = newDuration;
+            this.$emit("updateBlockStart", this.resizingBlockIndex, newStart);
+            this.$emit("updateBlockDuration", this.resizingBlockIndex, newDuration);
+          }
+        } else if (this.resizingDirection === "right") {
+          const newDuration = Math.max(0.5, this.originalDuration + dx * this.visibleDuration);
+          block.duration = newDuration;
+          this.$emit("updateBlockDuration", this.resizingBlockIndex, newDuration);
+        }
+      }
+    },
+    stopResizingBlock() {
+      this.resizingBlockIndex = null;
+      this.resizingDirection = null;
+      document.removeEventListener("mousemove", this.resizeBlock);
+      document.removeEventListener("mouseup", this.stopResizingBlock);
     },
   },
 };
@@ -219,12 +238,10 @@ export default {
   cursor: ew-resize;
   background-color: #ffffff66;
 }
-
 .left-handle {
   left: 0;
   cursor: w-resize;
 }
-
 .right-handle {
   right: 0;
   cursor: e-resize;
@@ -240,7 +257,6 @@ export default {
   margin-top: 5px;
   margin-left: -10px;
 }
-
 .minimap-view {
   position: absolute;
   height: 100%;
@@ -250,8 +266,6 @@ export default {
   display: flex;
   align-items: center;
 }
-
-/* Poignées de la minimap */
 .minimap-handle {
   width: 8px;
   height: 100%;
@@ -259,12 +273,10 @@ export default {
   border-radius: 50%;
   border: 2px solid #555;
 }
-
 .left-handle {
   position: absolute;
   left: 0;
 }
-
 .right-handle {
   position: absolute;
   right: 0;

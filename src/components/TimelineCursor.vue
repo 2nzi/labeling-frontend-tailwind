@@ -38,7 +38,7 @@ export default {
 .cursor-head {
   content: "";
   position: absolute;
-  top: 0;
+  top: -10px;
   left: -2px;
   width: 8px;
   height: 10px;

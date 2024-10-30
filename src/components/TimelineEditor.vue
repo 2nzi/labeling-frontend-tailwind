@@ -69,7 +69,7 @@
 
           <!-- Bouton d'ajout de ligne -->
           <div class="add-event-row" @click="addEvent">
-            + Ajouter un événement
+            +
           </div>
         </div>
       </div>
@@ -214,9 +214,11 @@ export default {
     updateVisibleDuration(newDuration) {
       this.visibleDuration = newDuration;
     },
-    updateBlockStart(index, newStart) {
-      if (this.selectedEvent !== null) {
-        this.events[this.selectedEvent].blocks[index].start = newStart;
+    updateBlockStart(eventIndex, blockIndex, newStart) {
+      if (this.events[eventIndex] && this.events[eventIndex].blocks[blockIndex]) {
+        this.events[eventIndex].blocks[blockIndex].start = newStart;
+      } else {
+        console.warn("Le bloc ou l'événement est introuvable pour l'index donné.");
       }
     },
     updateEventName(newName) {
@@ -329,9 +331,9 @@ export default {
   background-color: #202020;
 }
 .add-event-row {
-  background-color: #444;
+  background-color: #464646;
   color: #aaa;
-  padding: 8px;
+  padding: 12px;
   text-align: center;
   cursor: pointer;
   border-top: 1px solid #555;

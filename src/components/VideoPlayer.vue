@@ -91,17 +91,27 @@
   align-items: center;
   width: 80%;
   height: 450px;
-  background: rgb(152, 152, 152);
+  background: #CCCCCC;
   cursor: pointer;
   position: relative;
+  border-radius: 0.5rem;
+
 }
 
 @media (min-width: 900px) {
   .video-player-container {
     min-width: 800px;
+
   }
 }
-  
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
+}
   /* .video-player-container.empty {
     border: 2px dashed #aaa;
   } */
@@ -109,10 +119,12 @@
   .video-player {
     width: 100%;
     height: 100%;
+    border-radius: 0.5rem;
+
   }
   
   .placeholder {
-    color: #ccc;
+    color: #464646;
     font-size: 1.5em;
     text-align: center;
   }
