@@ -1,6 +1,25 @@
 <template>
   <div id="app">
-    <TimelineEditor ref="timelineEditor" @videoUploaded="handleVideoUploaded" />
+    <!-- Toggle Button for switching views -->
+    <div class="view-toggle">
+      <label class="switch">
+        <input type="checkbox" v-model="showMosaicView" />
+        <span class="slider"></span>
+      </label>
+      <span>{{ showMosaicView ? "Mosaic View" : "Timeline Editor" }}</span>
+    </div>
+
+    <!-- Show TimelineEditor or MosaicView based on toggle -->
+    <TimelineEditor
+      v-if="!showMosaicView"
+      ref="timelineEditor"
+      @videoUploaded="handleVideoUploaded"
+    />
+    <MosaicView
+      v-if="showMosaicView"
+      :activeLabel="activeLabel"
+      @updateLabel="updateActiveLabel"
+    />
 
     <div class="export-controls">
       <button 
@@ -16,15 +35,19 @@
 
 <script>
 import TimelineEditor from './components/TimelineEditor.vue';
+import MosaicView from './components/MosaicView.vue';
 import { saveAs } from 'file-saver';
 
 export default {
   components: {
     TimelineEditor,
+    MosaicView,
   },
   data() {
     return {
       isVideoLoaded: false,
+      showMosaicView: false, // Toggle state
+      activeLabel: 1, // Label par défaut
     };
   },
   methods: {
@@ -50,7 +73,12 @@ export default {
 
     handleVideoUploaded() {
       this.isVideoLoaded = true;
-    }
+    },
+
+    updateActiveLabel(newLabel) {
+      // Met à jour le label actif lorsque MosaicView envoie un nouveau label
+      this.activeLabel = newLabel;
+    },
   }
 };
 </script>
@@ -59,6 +87,60 @@ export default {
 #app {
   text-align: center;
 }
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 25px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 25px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 3.5px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4caf50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
 .export-controls {
   display: flex;
   justify-content: center;
