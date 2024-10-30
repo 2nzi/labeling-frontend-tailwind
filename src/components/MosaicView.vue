@@ -1,21 +1,34 @@
 <template>
   <div class="mosaic-container">
-    <!-- Affiche la zone d'upload si aucune vidéo n'est chargée -->
-    <div v-if="!videoUploaded" class="upload-section">
+    <!-- Upload Button -->
+    <div v-if="!videoFile" class="upload-section">
       <input type="file" @change="handleVideoUpload" accept="video/*" />
-      <p>Upload a video to generate a 3-segment mosaic preview</p>
+      <p>Upload a video to display in segments</p>
     </div>
-    
-    <!-- Affiche la mosaïque si la vidéo est chargée -->
-    <div v-else class="mosaic-grid">
-      <div
-        v-for="clip in clips"
-        :key="clip.id"
-        class="clip"
-      >
-        <video :src="clip.url" controls width="150" height="150" loop muted></video>
+
+    <!-- Mosaic Video Grid -->
+    <div v-else class="mosaic-preview">
+      <div class="video-grid">
+        <div
+          v-for="(segment, index) in segments"
+          :key="index"
+          class="video-section"
+        >
+          <video
+            :src="videoUrl"
+            autoplay
+            muted
+            loop
+            :currentTime="segment.startTime"
+            @loadedmetadata="setSegmentStart($event, segment.startTime)"
+            class="video-player"
+          ></video>
+        </div>
       </div>
+      <button @click="resetVideo" class="reset-button">Upload New Video</button>
     </div>
+
+    <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
   </div>
 </template>
 
@@ -23,68 +36,59 @@
 export default {
   data() {
     return {
-      videoUploaded: false, // Statut de l'upload
-      clips: [], // Liste des clips à afficher
+      videoFile: null,        // Holds the uploaded video file
+      videoUrl: null,         // URL for the video file to display
+      errorMessage: "",       // Error message display
+      segments: [],           // Holds segment time ranges
+      segmentDuration: 3,     // Segment duration in seconds (adjust as needed)
     };
   },
   methods: {
-    async handleVideoUpload(event) {
+    handleVideoUpload(event) {
       const file = event.target.files[0];
       if (file) {
-        await this.generateMosaicPreview(file);
-      }
-    },
-
-    async generateMosaicPreview(videoFile) {
-      try {
-        // Obtenir la durée de la vidéo
-        const duration = await this.getVideoDuration(videoFile);
-
-        // Si la vidéo est suffisamment longue pour 3 segments de 3 secondes
-        const clipDuration = 3; // Durée de chaque clip en secondes
-        const clipCount = Math.min(3, Math.floor(duration / clipDuration));
-
-        // Effacer les clips précédents
-        this.clips = [];
-
-        for (let i = 0; i < clipCount; i++) {
-          const clipUrl = await this.createClip(videoFile, i * clipDuration, clipDuration);
-          this.clips.push({ id: i, url: clipUrl });
+        if (!file.type.startsWith("video/")) {
+          this.errorMessage = "Please upload a valid video file.";
+          return;
         }
 
-        this.videoUploaded = true;
-      } catch (error) {
-        console.error("Erreur lors de la génération des clips :", error);
+        this.videoFile = file;
+        this.videoUrl = URL.createObjectURL(file);
+        this.errorMessage = "";
+
+        // Initialize segments based on duration after metadata is loaded
+        const video = document.createElement("video");
+        video.src = this.videoUrl;
+        video.onloadedmetadata = () => {
+          const duration = video.duration;
+          this.initializeSegments(duration);
+        };
       }
     },
+    initializeSegments(duration) {
+      this.segments = [];
+      for (let startTime = 0; startTime < duration; startTime += this.segmentDuration) {
+        this.segments.push({
+          startTime: startTime,
+          endTime: Math.min(startTime + this.segmentDuration, duration), // End time cannot exceed the video's duration
+        });
+      }
+    },
+    setSegmentStart(event, startTime) {
+      const videoElement = event.target;
+      videoElement.currentTime = startTime;
 
-    async getVideoDuration(file) {
-      return new Promise((resolve) => {
-        const video = document.createElement("video");
-        video.preload = "metadata";
-        video.src = URL.createObjectURL(file);
-        video.onloadedmetadata = () => {
-          resolve(video.duration);
-          URL.revokeObjectURL(video.src);
-        };
+      // Restart at the specified start time when video loops
+      videoElement.addEventListener("timeupdate", () => {
+        if (videoElement.currentTime >= startTime + this.segmentDuration || videoElement.currentTime >= videoElement.duration) {
+          videoElement.currentTime = startTime;
+        }
       });
     },
-
-    async createClip(videoFile, startTime) {
-      return new Promise((resolve) => {
-        const videoUrl = URL.createObjectURL(videoFile);
-        const videoElement = document.createElement("video");
-        videoElement.src = videoUrl;
-        videoElement.currentTime = startTime;
-
-        // Créer une boucle de lecture de "duration" secondes en utilisant `onseeked`
-        videoElement.onseeked = () => {
-          videoElement.pause();
-          resolve(videoUrl);
-        };
-
-        videoElement.play();
-      });
+    resetVideo() {
+      this.videoFile = null;
+      this.videoUrl = null;
+      this.segments = [];
     },
   },
 };
@@ -93,18 +97,55 @@ export default {
 <style scoped>
 .mosaic-container {
   text-align: center;
+  padding: 10px;
 }
+
 .upload-section {
   margin-top: 20px;
 }
-.mosaic-grid {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
+
+.mosaic-preview {
+  margin-top: 20px;
 }
-.clip {
-  width: 150px;
-  height: 150px;
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 3px;
+  justify-items: center;
+  max-width: 80%;
+}
+
+.video-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #5e5e5e; /* Adjust color as needed */
+  border-radius: 8px;
   overflow: hidden;
+}
+
+.video-player {
+  width: 100%;
+  height: auto;
+}
+
+.reset-button {
+  margin-top: 10px;
+  background-color: #007acc;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.reset-button:hover {
+  background-color: #005ea0;
+}
+
+.error-message {
+  color: red;
+  margin-top: 10px;
 }
 </style>
