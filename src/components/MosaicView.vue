@@ -1,14 +1,31 @@
 <template>
   <div class="mosaic-container">
-    <!-- Upload Button -->
-    <div v-if="!videoFile" class="upload-section">
-      <input type="file" @change="handleVideoUpload" accept="video/*" />
-      <p>Upload a video to display in segments</p>
+    <!-- Loading Section -->
+    <div v-if="loading" class="loading-section">
+      <p>Compression en cours, veuillez patienter...</p>
+      <div class="loader"></div>
     </div>
 
-    <!-- Mosaic View with Grid and Preview Section -->
+    <!-- Upload Section -->
+    <div v-else-if="!videoFile" class="upload-section">
+      <!-- Custom Drag-and-Drop Upload Zone -->
+      <label
+        class="drop-zone"
+        @dragover.prevent
+        @drop.prevent="handleDrop"
+      >
+        <input type="file" id="file-upload" @change="handleVideoUpload" accept="video/*" class="file-input"/>
+        <div class="drop-zone-content">
+          <i class="upload-icon"></i>
+          <p class="drop-zone-title">DÉPOSEZ VOTRE FICHIER ICI</p>
+          <p class="drop-zone-subtitle">Glissez-déposez votre vidéo ou cliquez pour sélectionner un fichier</p>
+        </div>
+      </label>
+    </div>
+
+    <!-- Mosaic Content -->
     <div v-else class="mosaic-content">
-      <!-- Left: Video Grid with Horizontal Scroll -->
+      <!-- Video Grid Section -->
       <div class="video-grid-container" @wheel="handleScroll">
         <div class="video-grid">
           <div
@@ -20,7 +37,7 @@
             @click="selectVideo(index)"
           >
             <video
-              :src="videoUrl"
+              :src="compressedVideoUrl"
               autoplay
               muted
               loop
@@ -32,11 +49,11 @@
         </div>
       </div>
 
-      <!-- Right: Preview of Hovered Video -->
+      <!-- Video Preview Section -->
       <div class="video-preview">
         <video
           v-if="hoveredVideo !== null"
-          :src="videoUrl"
+          :src="compressedVideoUrl"
           autoplay
           muted
           loop
@@ -48,44 +65,73 @@
       </div>
     </div>
 
-    <button @click="resetVideo" class="reset-button">Upload New Video</button>
-
+    <!-- Reset Button -->
+    <button @click="resetVideo" class="reset-button">Charger une nouvelle vidéo</button>
     <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
   </div>
 </template>
-
 <script>
 export default {
   data() {
     return {
       videoFile: null,
-      videoUrl: null,
+      compressedVideoUrl: null,
       errorMessage: "",
       segments: [],
       segmentDuration: 3,
-      selectedVideo: null, // State to track the selected video
-      hoveredVideo: null,   // State to track the hovered video for preview
+      selectedVideo: null,
+      hoveredVideo: null,
+      loading: false, // State to show loading animation
     };
   },
   methods: {
+    
     handleVideoUpload(event) {
       const file = event.target.files[0];
-      if (file) {
-        if (!file.type.startsWith("video/")) {
-          this.errorMessage = "Please upload a valid video file.";
-          return;
-        }
-
+      this.processUpload(file);
+    },
+    handleDrop(event) {
+      const file = event.dataTransfer.files[0];
+      this.processUpload(file);
+    },
+    processUpload(file) {
+      if (file && file.type.startsWith("video/")) {
         this.videoFile = file;
-        this.videoUrl = URL.createObjectURL(file);
-        this.errorMessage = "";
+        this.loading = true; // Show loading while compressing
+        this.uploadAndCompressVideo(file);
+      } else {
+        this.errorMessage = "Veuillez déposer un fichier vidéo valide.";
+      }
+    },
+    async uploadAndCompressVideo(file) {
+      const formData = new FormData();
+      formData.append("file", file);
 
-        const video = document.createElement("video");
-        video.src = this.videoUrl;
-        video.onloadedmetadata = () => {
-          const duration = video.duration;
-          this.initializeSegments(duration);
-        };
+      try {
+        const response = await fetch("http://localhost:8000/upload-video", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          this.compressedVideoUrl = data.compressed_video_path;
+          this.loading = false; // Hide loading once compression is done
+
+          // Initialize segments for the compressed video
+          const video = document.createElement("video");
+          video.src = this.compressedVideoUrl;
+          video.onloadedmetadata = () => {
+            const duration = video.duration;
+            this.initializeSegments(duration);
+          };
+        } else {
+          this.errorMessage = "Erreur lors de la compression de la vidéo.";
+          this.loading = false;
+        }
+      } catch (error) {
+        this.errorMessage = "Échec de la compression.";
+        this.loading = false;
       }
     },
     initializeSegments(duration) {
@@ -109,10 +155,11 @@ export default {
     },
     resetVideo() {
       this.videoFile = null;
-      this.videoUrl = null;
+      this.compressedVideoUrl = null;
       this.segments = [];
       this.selectedVideo = null;
       this.hoveredVideo = null;
+      this.loading = false;
     },
     handleScroll(event) {
       const container = event.currentTarget;
@@ -128,7 +175,6 @@ export default {
   },
 };
 </script>
-
 <style scoped>
 .mosaic-container {
   text-align: center;
@@ -137,24 +183,82 @@ export default {
 
 .upload-section {
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-/* Layout of grid and preview sections */
+/* Style for custom file upload */
+.drop-zone {
+  width: 300px;
+  height: 200px;
+  border: 2px dashed #007acc;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.drop-zone:hover {
+  background-color: #f3faff;
+}
+
+.file-input {
+  display: none; /* Hide default input */
+}
+
+.drop-zone-content {
+  text-align: center;
+  color: #555;
+}
+
+.drop-zone-title {
+  font-weight: bold;
+  font-size: 16px;
+  color: #333;
+}
+
+.drop-zone-subtitle {
+  font-size: 12px;
+  color: #888;
+}
+
+.loading-section {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.loader {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .mosaic-content {
   display: flex;
   justify-content: center;
   align-items: flex-start;
   gap: 20px;
   margin-top: 20px;
-  max-height: 80vh; /* Limit the height of the mosaic content to 80% of viewport */
+  max-height: 80vh;
 }
 
-/* Left: Scrollable Grid */
 .video-grid-container {
   width: 60%;
   overflow-x: auto;
-  overflow-y: hidden;
-  max-height: 80vh; /* Limit the grid container's height */
+  max-height: 80vh;
   white-space: nowrap;
 }
 
@@ -164,8 +268,6 @@ export default {
   grid-auto-flow: column;
   grid-template-rows: repeat(5, 1fr);
   gap: 3px;
-  align-items: start;
-  padding: 0;
 }
 
 .video-section {
@@ -176,12 +278,12 @@ export default {
   border-radius: 8px;
   overflow: hidden;
   width: 150px;
-  height: calc(80vh / 5 - 6px); /* Divide 80% height by 5 rows, adjusting for gaps */
+  height: calc(80vh / 5 - 6px);
   cursor: pointer;
 }
 
 .video-section.selected {
-  border: 3px solid #f30101; /* Red border for selected video */
+  border: 3px solid #f30101;
 }
 
 .video-player {
@@ -189,7 +291,6 @@ export default {
   height: 100%;
 }
 
-/* Right: Preview of hovered video */
 .video-preview {
   width: 35%;
   display: flex;
@@ -197,7 +298,7 @@ export default {
   justify-content: center;
   border: 2px solid #ccc;
   border-radius: 8px;
-  height: 80vh; /* Match height limit of the grid */
+  height: 80vh;
 }
 
 .preview-player {
@@ -212,17 +313,22 @@ export default {
 }
 
 .reset-button {
-  margin-top: 10px;
-  background-color: #007acc;
+  margin-top: 20px;
+  background: linear-gradient(135deg, #4a90e2, #007acc);
   color: white;
   padding: 10px 20px;
   border: none;
-  border-radius: 5px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
   cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .reset-button:hover {
-  background-color: #005ea0;
+  background: linear-gradient(135deg, #007acc, #005ea0);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 .error-message {
