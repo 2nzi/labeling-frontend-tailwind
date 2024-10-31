@@ -1,5 +1,5 @@
 <template>
-  <div class="mosaic-container">
+  <div class="mosaic-container" @keydown="handleKeydown" tabindex="0">
     <!-- Loading Section -->
     <div v-if="loading" class="loading-section">
       <p>Compression en cours, veuillez patienter...</p>
@@ -26,15 +26,16 @@
     <!-- Mosaic Content -->
     <div v-else class="mosaic-content">
       <!-- Video Grid Section -->
-      <div class="video-grid-container" @wheel="handleScroll">
+      <div class="video-grid-container" :style="{ '--num-rows': numRows }" @wheel="handleScroll">
         <div class="video-grid">
           <div
             v-for="(segment, index) in segments"
             :key="index"
             :class="['video-section', { selected: selectedVideo === index }]"
+            :style="{ borderColor: labeledVideos[index] ? getLabelColor(labeledVideos[index]) : '#5e5e5e' }"
             @mouseover="hoverVideo(index)"
             @mouseleave="hoverVideo(null)"
-            @click="selectVideo(index)"
+            @click="labelVideo(index)"
           >
             <video
               :src="compressedVideoUrl"
@@ -45,6 +46,11 @@
               @loadedmetadata="setSegmentStart($event, segment.startTime)"
               class="video-player"
             ></video>
+            <span v-if="labeledVideos[index]" 
+                  :style="{ color: getLabelColor(labeledVideos[index]) }" 
+                  class="label-text">
+              {{ labeledVideos[index] }}
+            </span>
           </div>
         </div>
       </div>
@@ -70,7 +76,11 @@
     <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
   </div>
 </template>
+
 <script>
+import sportsConfigurations from "@/assets/sportsConfigurations.js";
+import colors from "@/assets/colors.js";
+
 export default {
   data() {
     return {
@@ -78,14 +88,23 @@ export default {
       compressedVideoUrl: null,
       errorMessage: "",
       segments: [],
-      segmentDuration: 3,
+      segmentDuration: 2,
       selectedVideo: null,
       hoveredVideo: null,
-      loading: false, // State to show loading animation
+      loading: false,
+      numRows: 9,
+      currentSport: "Surf", // Specify the sport type here
+      currentLabelIndex: 0, // Active label index
+      labeledVideos: {}, // Store labels by video index
     };
   },
+  computed: {
+    currentLabel() {
+      return sportsConfigurations[this.currentSport].events[this.currentLabelIndex];
+    },
+  },
+
   methods: {
-    
     handleVideoUpload(event) {
       const file = event.target.files[0];
       this.processUpload(file);
@@ -97,7 +116,7 @@ export default {
     processUpload(file) {
       if (file && file.type.startsWith("video/")) {
         this.videoFile = file;
-        this.loading = true; // Show loading while compressing
+        this.loading = true;
         this.uploadAndCompressVideo(file);
       } else {
         this.errorMessage = "Veuillez déposer un fichier vidéo valide.";
@@ -116,9 +135,8 @@ export default {
         if (response.ok) {
           const data = await response.json();
           this.compressedVideoUrl = data.compressed_video_path;
-          this.loading = false; // Hide loading once compression is done
+          this.loading = false;
 
-          // Initialize segments for the compressed video
           const video = document.createElement("video");
           video.src = this.compressedVideoUrl;
           video.onloadedmetadata = () => {
@@ -160,22 +178,49 @@ export default {
       this.selectedVideo = null;
       this.hoveredVideo = null;
       this.loading = false;
+      this.labeledVideos = {}; // Clear labels on reset
     },
     handleScroll(event) {
       const container = event.currentTarget;
       container.scrollLeft += event.deltaY;
       event.preventDefault();
     },
-    selectVideo(index) {
+    labelVideo(index) {
+      const label = this.currentLabel;
+      const color = this.getLabelColor(label);
+      this.labeledVideos[index] = label;
       this.selectedVideo = index;
+      
+      // Log de l'événement et de la couleur
+      console.log(`Label attribué : ${label}`);
+      console.log(`Couleur : ${color}`);
     },
     hoverVideo(index) {
       this.hoveredVideo = index;
     },
+    handleKeydown(event) {
+      const key = parseInt(event.key);
+      if (key > 0 && key <= sportsConfigurations[this.currentSport].events.length) {
+        this.currentLabelIndex = key - 1;
+      }
+    },
+    getLabelColor(label) {
+      const eventIndex = sportsConfigurations[this.currentSport].events.indexOf(label);
+      return colors[eventIndex % colors.length]; // Utilise la couleur correspondante dans le tableau
+    },
+
+  },
+  mounted() {
+    this.$el.focus();
   },
 };
 </script>
+
 <style scoped>
+:root {
+  --num-rows: 5;
+}
+
 .mosaic-container {
   text-align: center;
   padding: 10px;
@@ -188,7 +233,6 @@ export default {
   align-items: center;
 }
 
-/* Style for custom file upload */
 .drop-zone {
   width: 300px;
   height: 200px;
@@ -206,7 +250,7 @@ export default {
 }
 
 .file-input {
-  display: none; /* Hide default input */
+  display: none;
 }
 
 .drop-zone-content {
@@ -266,29 +310,28 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   grid-auto-flow: column;
-  grid-template-rows: repeat(5, 1fr);
+  grid-template-rows: repeat(var(--num-rows), 1fr);
   gap: 3px;
 }
 
 .video-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #5e5e5e;
+  position: relative;
+  width: 150px;
+  aspect-ratio: 16 / 9;
+  border: 3px solid #5e5e5e;
   border-radius: 8px;
   overflow: hidden;
-  width: 150px;
-  height: calc(80vh / 5 - 6px);
   cursor: pointer;
 }
 
 .video-section.selected {
-  border: 3px solid #f30101;
+  border: 4px solid #f30101;
 }
 
 .video-player {
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
 .video-preview {
@@ -335,4 +378,16 @@ export default {
   color: red;
   margin-top: 10px;
 }
+
+.label-text {
+  position: absolute;
+  bottom: 4px; /* Adjust to place it within the video */
+  left: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  /* background-color: rgba(255, 255, 255, 0.7); */
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
 </style>
