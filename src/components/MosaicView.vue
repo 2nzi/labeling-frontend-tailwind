@@ -26,17 +26,17 @@
     <!-- Mosaic Content -->
     <div v-else class="mosaic-content">
       <!-- Video Grid Section -->
-      <div class="video-grid-container" :style="{ '--num-rows': numRows }" @wheel="handleScroll">
+      <div class="video-grid-container" :key="segments.length" :style="{ '--num-rows': numRows }" @wheel="handleScroll">
         <div class="video-grid">
           <div
             v-for="(segment, index) in segments"
-            :key="index"
+            :key="segment.startTime"
             :class="['video-section', { selected: selectedVideos.includes(index) }]"
             :style="{ borderColor: labeledVideos[index] ? getLabelColor(labeledVideos[index]) : '#5e5e5e' }"
             @mouseover="hoverVideo(index)"
             @mouseleave="hoverVideo(null)"
             @click="handleClick(index, $event)"
-            >
+          >
             <video
               :src="compressedVideoUrl"
               autoplay
@@ -63,7 +63,7 @@
           autoplay
           muted
           loop
-          :currentTime="segments[hoveredVideo].startTime"
+          :currentTime="segments[hoveredVideo]?.startTime"
           key="preview-video"
           class="preview-player"
         ></video>
@@ -106,12 +106,12 @@ export default {
 
   methods: {
     handleClick(index, event) {
-    if (event.ctrlKey) {
-      this.selectVideo(index, event);
-    } else {
-      this.labelVideo(index);
-    }
-  },
+      if (event.ctrlKey) {
+        this.selectVideo(index, event);
+      } else {
+        this.labelVideo(index);
+      }
+    },
     handleVideoUpload(event) {
       const file = event.target.files[0];
       this.processUpload(file);
@@ -197,8 +197,6 @@ export default {
       const color = this.getLabelColor(label);
       this.labeledVideos[index] = label;
       this.selectedVideo = index;
-      
-      // Log de l'événement et de la couleur
       console.log(`Label attribué : ${label}`);
       console.log(`Couleur : ${color}`);
     },
@@ -206,7 +204,6 @@ export default {
       this.hoveredVideo = index;
     },
     selectVideo(index) {
-      // Toggle selection when Ctrl is pressed
       if (this.selectedVideos.includes(index)) {
         this.selectedVideos = this.selectedVideos.filter((i) => i !== index);
       } else {
@@ -224,33 +221,21 @@ export default {
       }
     },
     joinSelectedVideos() {
-      // Sort selected videos by their indices
       this.selectedVideos.sort((a, b) => a - b);
-
-      // Get start and end times from the first and last selected segments
       const startTime = this.segments[this.selectedVideos[0]].startTime;
       const endTime = this.segments[this.selectedVideos[this.selectedVideos.length - 1]].endTime;
-
-      // Create a new joined segment
       const newSegment = { startTime, endTime };
-      
-      // Update segments by replacing selected segments with the new joined segment
-      this.segments = [
-        ...this.segments.slice(0, this.selectedVideos[0]),
-        newSegment,
-        ...this.segments.slice(this.selectedVideos[this.selectedVideos.length - 1] + 1),
-      ];
 
-      // Clear selected videos after joining
+      // Update segments with reactivity-friendly approach
+      this.segments.splice(this.selectedVideos[0], this.selectedVideos.length, newSegment);
       this.selectedVideos = [];
-      console.log(`Joined videos into new segment from ${startTime}s to ${endTime}s`);
+      console.log(`Nouveau segment de ${startTime}s à ${endTime}s créé après fusion.`);
     },
 
     getLabelColor(label) {
       const eventIndex = sportsConfigurations[this.currentSport].events.indexOf(label);
-      return colors[eventIndex % colors.length]; // Utilise la couleur correspondante dans le tableau
+      return colors[eventIndex % colors.length];
     },
-
   },
   mounted() {
     this.$el.focus();
