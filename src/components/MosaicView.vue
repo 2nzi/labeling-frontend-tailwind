@@ -31,12 +31,12 @@
           <div
             v-for="(segment, index) in segments"
             :key="index"
-            :class="['video-section', { selected: selectedVideo === index }]"
+            :class="['video-section', { selected: selectedVideos.includes(index) }]"
             :style="{ borderColor: labeledVideos[index] ? getLabelColor(labeledVideos[index]) : '#5e5e5e' }"
             @mouseover="hoverVideo(index)"
             @mouseleave="hoverVideo(null)"
-            @click="labelVideo(index)"
-          >
+            @click="handleClick(index, $event)"
+            >
             <video
               :src="compressedVideoUrl"
               autoplay
@@ -89,7 +89,7 @@ export default {
       errorMessage: "",
       segments: [],
       segmentDuration: 2,
-      selectedVideo: null,
+      selectedVideos: [], // Store multiple selected video indices
       hoveredVideo: null,
       loading: false,
       numRows: 9,
@@ -105,6 +105,13 @@ export default {
   },
 
   methods: {
+    handleClick(index, event) {
+    if (event.ctrlKey) {
+      this.selectVideo(index, event);
+    } else {
+      this.labelVideo(index);
+    }
+  },
     handleVideoUpload(event) {
       const file = event.target.files[0];
       this.processUpload(file);
@@ -198,12 +205,47 @@ export default {
     hoverVideo(index) {
       this.hoveredVideo = index;
     },
+    selectVideo(index) {
+      // Toggle selection when Ctrl is pressed
+      if (this.selectedVideos.includes(index)) {
+        this.selectedVideos = this.selectedVideos.filter((i) => i !== index);
+      } else {
+        this.selectedVideos.push(index);
+      }
+      console.log(`Selected videos:`, this.selectedVideos);
+    },
     handleKeydown(event) {
+      if (event.key === "j" && this.selectedVideos.length > 1) {
+        this.joinSelectedVideos();
+      }
       const key = parseInt(event.key);
       if (key > 0 && key <= sportsConfigurations[this.currentSport].events.length) {
         this.currentLabelIndex = key - 1;
       }
     },
+    joinSelectedVideos() {
+      // Sort selected videos by their indices
+      this.selectedVideos.sort((a, b) => a - b);
+
+      // Get start and end times from the first and last selected segments
+      const startTime = this.segments[this.selectedVideos[0]].startTime;
+      const endTime = this.segments[this.selectedVideos[this.selectedVideos.length - 1]].endTime;
+
+      // Create a new joined segment
+      const newSegment = { startTime, endTime };
+      
+      // Update segments by replacing selected segments with the new joined segment
+      this.segments = [
+        ...this.segments.slice(0, this.selectedVideos[0]),
+        newSegment,
+        ...this.segments.slice(this.selectedVideos[this.selectedVideos.length - 1] + 1),
+      ];
+
+      // Clear selected videos after joining
+      this.selectedVideos = [];
+      console.log(`Joined videos into new segment from ${startTime}s to ${endTime}s`);
+    },
+
     getLabelColor(label) {
       const eventIndex = sportsConfigurations[this.currentSport].events.indexOf(label);
       return colors[eventIndex % colors.length]; // Utilise la couleur correspondante dans le tableau
