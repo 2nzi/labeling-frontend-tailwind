@@ -6,22 +6,6 @@
       <div class="loader"></div>
     </div>
 
-    <!-- Upload Section -->
-    <div v-else-if="!videoFile" class="upload-section">
-      <!-- Custom Drag-and-Drop Upload Zone -->
-      <label
-        class="drop-zone"
-        @dragover.prevent
-        @drop.prevent="handleDrop"
-      >
-        <input type="file" id="file-upload" @change="handleVideoUpload" accept="video/*" class="file-input"/>
-        <div class="drop-zone-content">
-          <i class="upload-icon"></i>
-          <p class="drop-zone-title">DÉPOSEZ VOTRE FICHIER ICI</p>
-          <p class="drop-zone-subtitle">Glissez-déposez votre vidéo ou cliquez pour sélectionner un fichier</p>
-        </div>
-      </label>
-    </div>
 
     <!-- Mosaic Content -->
     <div v-else class="mosaic-content">
@@ -258,47 +242,10 @@ export default {
   padding: 10px;
 }
 
-.upload-section {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
 
-.drop-zone {
-  width: 300px;
-  height: 200px;
-  border: 2px dashed #007acc;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.drop-zone:hover {
-  background-color: #f3faff;
-}
 
 .file-input {
   display: none;
-}
-
-.drop-zone-content {
-  text-align: center;
-  color: #555;
-}
-
-.drop-zone-title {
-  font-weight: bold;
-  font-size: 16px;
-  color: #333;
-}
-
-.drop-zone-subtitle {
-  font-size: 12px;
-  color: #888;
 }
 
 .loading-section {
