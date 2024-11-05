@@ -1,53 +1,63 @@
 <template>
   <div id="app">
-    <!-- Toggle Button for switching views -->
-    <div class="view-toggle">
-      <label class="switch">
-        <input type="checkbox" v-model="showMosaicView" />
-        <span class="slider"></span>
-      </label>
-      <span>{{ showMosaicView ? "Timeline Editor" : "Mosaic View" }}</span>
-    </div>
+    <!-- Affiche UploadView tant que la vidéo n'est pas prête -->
+    <UploadView v-if="!isVideoLoaded" @videoUploaded="handleVideoUploaded" />
 
-    <!-- Show TimelineEditor or MosaicView based on toggle -->
-    <TimelineEditor
-      v-if="showMosaicView"
-      ref="timelineEditor"
-      @videoUploaded="handleVideoUploaded"
-    />
-    <MosaicView
-      v-if="!showMosaicView"
-      :activeLabel="activeLabel"
-      @updateLabel="updateActiveLabel"
-    />
+    <!-- Affiche les autres vues si la vidéo est chargée -->
+    <div v-else>
+      <!-- Toggle Button for switching views -->
+      <div class="view-toggle">
+        <label class="switch">
+          <input type="checkbox" v-model="showMosaicView" />
+          <span class="slider"></span>
+        </label>
+        <span>{{ showMosaicView ? "Timeline Editor" : "Mosaic View" }}</span>
+      </div>
 
-    <div class="export-controls">
-      <button 
-        @click="exportAsJSON" 
-        class="export-button"
-        :disabled="!isVideoLoaded"
-      >
-        Download JSON
-      </button>
+      <!-- Show TimelineEditor or MosaicView based on toggle -->
+      <TimelineEditor
+        v-if="showMosaicView"
+        ref="timelineEditor"
+        :videoInfo="videoInfo"
+      />
+      <MosaicView
+        v-if="!showMosaicView"
+        :activeLabel="activeLabel"
+        :videoInfo="videoInfo"
+        @updateLabel="updateActiveLabel"
+      />
+
+      <div class="export-controls">
+        <button 
+          @click="exportAsJSON" 
+          class="export-button"
+          :disabled="!isVideoLoaded"
+        >
+          Download JSON
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import UploadView from './components/UploadView.vue';
 import TimelineEditor from './components/TimelineEditor.vue';
 import MosaicView from './components/MosaicView.vue';
 import { saveAs } from 'file-saver';
 
 export default {
   components: {
+    UploadView,
     TimelineEditor,
     MosaicView,
   },
   data() {
     return {
       isVideoLoaded: false,
-      showMosaicView: false, // Toggle state
-      activeLabel: 1, // Label par défaut
+      showMosaicView: false,
+      activeLabel: 1,
+      videoInfo: null, // Contient les informations de la vidéo, y compris le sport sélectionné
     };
   },
   methods: {
@@ -71,17 +81,18 @@ export default {
       saveAs(jsonBlob, "export_data.json");
     },
 
-    handleVideoUploaded() {
+    handleVideoUploaded(videoData) {
       this.isVideoLoaded = true;
+      this.videoInfo = videoData; // Stocke les informations de la vidéo, y compris le sport sélectionné
     },
 
     updateActiveLabel(newLabel) {
-      // Met à jour le label actif lorsque MosaicView envoie un nouveau label
       this.activeLabel = newLabel;
     },
   }
 };
 </script>
+
 
 <style scoped>
 #app {

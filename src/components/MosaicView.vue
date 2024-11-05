@@ -1,40 +1,36 @@
 <template>
   <div class="mosaic-container" @keydown="handleKeydown" tabindex="0">
-    <!-- Loading Section -->
-    <div v-if="loading" class="loading-section">
-      <p>Compression en cours, veuillez patienter...</p>
-      <div class="loader"></div>
+    <!-- Affichage des informations générales de la vidéo -->
+    <div v-if="videoInfo" class="video-info">
+      <p><strong>Original Video Path:</strong> <a :href="videoInfo.original_video_path" target="_blank">{{ videoInfo.original_video_path }}</a></p>
+      <p><strong>Compressed Video Path:</strong> <a :href="videoInfo.compressed_video_path" target="_blank">{{ videoInfo.compressed_video_path }}</a></p>
+      <p><strong>Scene Data JSON Path:</strong> <a :href="videoInfo.scene_data_path" target="_blank">{{ videoInfo.scene_data_path }}</a></p>
+      <p><strong>Upload Date:</strong> {{ videoInfo.upload_date }}</p>
+      <p><strong>Selected Sport:</strong> {{ videoInfo.selectedSport }}</p>
     </div>
 
-
     <!-- Mosaic Content -->
-    <div v-else class="mosaic-content">
+    <div class="mosaic-content">
       <!-- Video Grid Section -->
-      <div class="video-grid-container" :key="segments.length" :style="{ '--num-rows': numRows }" @wheel="handleScroll">
-        <div class="video-grid">
+      <div class="video-grid-container" @wheel="handleScroll">
+        <div class="video-grid" :style="{ '--num-rows': numRows }">
           <div
-            v-for="(segment, index) in segments"
-            :key="segment.startTime"
+            v-for="(clip, index) in filteredClips"
+            :key="index"
             :class="['video-section', { selected: selectedVideos.includes(index) }]"
-            :style="{ borderColor: labeledVideos[index] ? getLabelColor(labeledVideos[index]) : '#5e5e5e' }"
             @mouseover="hoverVideo(index)"
             @mouseleave="hoverVideo(null)"
             @click="handleClick(index, $event)"
           >
             <video
-              :src="compressedVideoUrl"
+              :src="videoInfo.compressed_video_path"
               autoplay
               muted
               loop
-              :currentTime="segment.startTime"
-              @loadedmetadata="setSegmentStart($event, segment.startTime)"
               class="video-player"
+              @loadedmetadata="setSegmentStart($event, clip.startTime)"
+              @timeupdate="loopSegment($event, clip.endTime)"
             ></video>
-            <span v-if="labeledVideos[index]" 
-                  :style="{ color: getLabelColor(labeledVideos[index]) }" 
-                  class="label-text">
-              {{ labeledVideos[index] }}
-            </span>
           </div>
         </div>
       </div>
@@ -43,230 +39,121 @@
       <div class="video-preview">
         <video
           v-if="hoveredVideo !== null"
-          :src="compressedVideoUrl"
+          :src="videoInfo.compressed_video_path"
           autoplay
           muted
           loop
-          :currentTime="segments[hoveredVideo]?.startTime"
-          key="preview-video"
+          :currentTime="filteredClips[hoveredVideo]?.startTime"
           class="preview-player"
         ></video>
-        <p v-else class="preview-placeholder">Hover over a video to preview</p>
+        <p v-else class="preview-placeholder">Survolez une vidéo pour la prévisualiser</p>
       </div>
     </div>
-
-    <!-- Reset Button -->
-    <button @click="resetVideo" class="reset-button">Charger une nouvelle vidéo</button>
-    <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
   </div>
 </template>
 
 <script>
-import sportsConfigurations from "@/assets/sportsConfigurations.js";
-import colors from "@/assets/colors.js";
-
 export default {
+  props: {
+    videoInfo: {
+      type: Object,
+      required: true
+    }
+  },
   data() {
     return {
-      videoFile: null,
-      compressedVideoUrl: null,
-      errorMessage: "",
-      segments: [],
-      segmentDuration: 2,
-      selectedVideos: [], // Store multiple selected video indices
       hoveredVideo: null,
-      loading: false,
-      numRows: 9,
-      currentSport: "Surf", // Specify the sport type here
-      currentLabelIndex: 0, // Active label index
-      labeledVideos: {}, // Store labels by video index
+      selectedVideos: [],
+      sceneData: [],
+      filteredClips: [],
+      availableSports: [],
+      numRows: 9 // Nombre de lignes dans la grille
     };
   },
-  computed: {
-    currentLabel() {
-      return sportsConfigurations[this.currentSport].events[this.currentLabelIndex];
-    },
+  async created() {
+    await this.loadSceneData();
   },
-
   methods: {
-    handleClick(index, event) {
-      if (event.ctrlKey) {
-        this.selectVideo(index, event);
-      } else {
-        this.labelVideo(index);
+    async loadSceneData() {
+      if (!this.videoInfo.scene_data_path) {
+        console.error("Le chemin des données de scène (scene_data_path) est manquant.");
+        return;
+      }
+
+      try {
+        const response = await fetch(this.videoInfo.scene_data_path);
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP : ${response.status}`);
+        }
+        const data = await response.json();
+        this.sceneData = data.scenes;
+        this.initializeAvailableSports(data.scenes);
+        this.generateClips();
+      } catch (error) {
+        console.error("Erreur lors du chargement des données de scène:", error);
       }
     },
-    handleVideoUpload(event) {
-      const file = event.target.files[0];
-      this.processUpload(file);
+    initializeAvailableSports(data) {
+      const sports = new Set(data.map(scene => scene.recognized_sport));
+      this.availableSports = Array.from(sports);
     },
-    handleDrop(event) {
-      const file = event.dataTransfer.files[0];
-      this.processUpload(file);
-    },
-    processUpload(file) {
-      if (file && file.type.startsWith("video/")) {
-        this.videoFile = file;
-        this.loading = true;
-        this.uploadAndCompressVideo(file);
-      } else {
-        this.errorMessage = "Veuillez déposer un fichier vidéo valide.";
-      }
-    },
-    async uploadAndCompressVideo(file) {
-  const formData = new FormData();
-  formData.append("file", file);
+    generateClips() {
+      const sportScenes = this.sceneData.filter(
+        scene => scene.recognized_sport === this.videoInfo.selectedSport
+      );
 
-  try {
-    console.log("Début de l'upload...");
-    const response = await fetch("http://localhost:8000/upload-video", {
-      method: "POST",
-      body: formData,
-    });
+      this.filteredClips = [];
+      sportScenes.forEach(scene => {
+        const startTime = this.timeToSeconds(scene.start);
+        const endTime = this.timeToSeconds(scene.end);
 
-    if (response.ok) {
-      const data = await response.json();
-      this.compressedVideoUrl = data.compressed_video_path;
-      console.log("Upload réussi, données reçues :", data);
-      this.loading = false;
-
-      const video = document.createElement("video");
-      video.src = this.compressedVideoUrl;
-      video.onloadedmetadata = () => {
-        const duration = video.duration;
-        this.initializeSegments(duration);
-        console.log("Segments initialisés pour la vidéo avec durée:", duration);
-      };
-    } else {
-      this.errorMessage = "Erreur lors de la compression de la vidéo.";
-      console.error("Erreur dans la réponse du serveur :", await response.text());
-      this.loading = false;
-    }
-  } catch (error) {
-    this.errorMessage = "Échec de la compression.";
-    console.error("Erreur lors de l'upload et compression :", error);
-    this.loading = false;
-  }
-},
-    initializeSegments(duration) {
-      this.segments = [];
-      for (let startTime = 0; startTime < duration; startTime += this.segmentDuration) {
-        this.segments.push({
-          startTime: startTime,
-          endTime: Math.min(startTime + this.segmentDuration, duration),
-        });
-      }
-    },
-    setSegmentStart(event, startTime) {
-      const videoElement = event.target;
-      videoElement.currentTime = startTime;
-
-      videoElement.addEventListener("timeupdate", () => {
-        if (videoElement.currentTime >= startTime + this.segmentDuration || videoElement.currentTime >= videoElement.duration) {
-          videoElement.currentTime = startTime;
+        for (let t = startTime; t < endTime; t += 1) {
+          this.filteredClips.push({
+            startTime: t,
+            endTime: Math.min(t + 1, endTime)
+          });
         }
       });
     },
-    resetVideo() {
-      this.videoFile = null;
-      this.compressedVideoUrl = null;
-      this.segments = [];
-      this.selectedVideo = null;
-      this.hoveredVideo = null;
-      this.loading = false;
-      this.labeledVideos = {}; // Clear labels on reset
+    timeToSeconds(timeStr) {
+      const [hours, minutes, seconds] = timeStr.split(":");
+      return (
+        parseInt(hours, 10) * 3600 +
+        parseInt(minutes, 10) * 60 +
+        parseFloat(seconds)
+      );
+    },
+    setSegmentStart(event, startTime) {
+      event.target.currentTime = startTime;
+    },
+    loopSegment(event, endTime) {
+      if (event.target.currentTime >= endTime) {
+        event.target.currentTime = endTime - 1;
+      }
     },
     handleScroll(event) {
       const container = event.currentTarget;
       container.scrollLeft += event.deltaY;
       event.preventDefault();
     },
-    labelVideo(index) {
-      const label = this.currentLabel;
-      const color = this.getLabelColor(label);
-      this.labeledVideos[index] = label;
-      this.selectedVideo = index;
-      console.log(`Label attribué : ${label}`);
-      console.log(`Couleur : ${color}`);
-    },
     hoverVideo(index) {
       this.hoveredVideo = index;
     },
-    selectVideo(index) {
+    handleClick(index) {
       if (this.selectedVideos.includes(index)) {
-        this.selectedVideos = this.selectedVideos.filter((i) => i !== index);
+        this.selectedVideos = this.selectedVideos.filter(i => i !== index);
       } else {
         this.selectedVideos.push(index);
       }
-      console.log(`Selected videos:`, this.selectedVideos);
-    },
-    handleKeydown(event) {
-      if (event.key === "j" && this.selectedVideos.length > 1) {
-        this.joinSelectedVideos();
-      }
-      const key = parseInt(event.key);
-      if (key > 0 && key <= sportsConfigurations[this.currentSport].events.length) {
-        this.currentLabelIndex = key - 1;
-      }
-    },
-    joinSelectedVideos() {
-      this.selectedVideos.sort((a, b) => a - b);
-      const startTime = this.segments[this.selectedVideos[0]].startTime;
-      const endTime = this.segments[this.selectedVideos[this.selectedVideos.length - 1]].endTime;
-      const newSegment = { startTime, endTime };
-
-      // Update segments with reactivity-friendly approach
-      this.segments.splice(this.selectedVideos[0], this.selectedVideos.length, newSegment);
-      this.selectedVideos = [];
-      console.log(`Nouveau segment de ${startTime}s à ${endTime}s créé après fusion.`);
-    },
-
-    getLabelColor(label) {
-      const eventIndex = sportsConfigurations[this.currentSport].events.indexOf(label);
-      return colors[eventIndex % colors.length];
-    },
-  },
-  mounted() {
-    this.$el.focus();
-  },
+    }
+  }
 };
 </script>
 
 <style scoped>
-:root {
-  --num-rows: 5;
-}
-
 .mosaic-container {
   text-align: center;
   padding: 10px;
-}
-
-
-
-.file-input {
-  display: none;
-}
-
-.loading-section {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.loader {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 .mosaic-content {
@@ -289,7 +176,7 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   grid-auto-flow: column;
-  grid-template-rows: repeat(var(--num-rows), 1fr);
+  grid-template-rows: repeat(var(--num-rows), 1fr); /* Nombre de lignes fixé par numRows */
   gap: 3px;
 }
 
@@ -333,40 +220,4 @@ export default {
   font-size: 1.2em;
   text-align: center;
 }
-
-.reset-button {
-  margin-top: 20px;
-  background: linear-gradient(135deg, #4a90e2, #007acc);
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.reset-button:hover {
-  background: linear-gradient(135deg, #007acc, #005ea0);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-}
-
-.error-message {
-  color: red;
-  margin-top: 10px;
-}
-
-.label-text {
-  position: absolute;
-  bottom: 4px; /* Adjust to place it within the video */
-  left: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  /* background-color: rgba(255, 255, 255, 0.7); */
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
 </style>
