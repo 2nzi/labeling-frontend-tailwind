@@ -18,9 +18,10 @@
             v-for="(clip, index) in filteredClips"
             :key="index"
             :class="['video-section', { selected: selectedVideos.includes(index) }]"
+            :style="{ borderColor: getLabelColor(index), borderWidth: labeledVideos[index] ? '4px' : '3px' }"
             @mouseover="hoverVideo(index)"
             @mouseleave="hoverVideo(null)"
-            @click="handleClick(index, $event)"
+            @click="handleClick(index)"
           >
             <video
               :src="videoInfo.compressed_video_path"
@@ -31,6 +32,11 @@
               @loadedmetadata="setSegmentStart($event, clip.startTime)"
               @timeupdate="loopSegment($event, clip.endTime)"
             ></video>
+            <span v-if="labeledVideos[index]" 
+                  class="label-text"
+                  :style="{ backgroundColor: getLabelColor(index) }">
+              {{ labeledVideos[index] }}
+            </span>
           </div>
         </div>
       </div>
@@ -53,6 +59,9 @@
 </template>
 
 <script>
+import sportsConfigurations from "@/assets/sportsConfigurations.js";
+import colors from "@/assets/colors.js";
+
 export default {
   props: {
     videoInfo: {
@@ -64,11 +73,24 @@ export default {
     return {
       hoveredVideo: null,
       selectedVideos: [],
+      labeledVideos: {}, // Store labels by video index
       sceneData: [],
       filteredClips: [],
       availableSports: [],
-      numRows: 9 // Nombre de lignes dans la grille
+      numRows: 9, // Nombre de lignes dans la grille
+      currentLabelIndex: 0 // Index du label actuellement sélectionné
     };
+  },
+  computed: {
+    currentLabel() {
+      const sportConfig = sportsConfigurations[this.videoInfo.selectedSport];
+      if (sportConfig && sportConfig.events && sportConfig.events.length > 0) {
+        return sportConfig.events[this.currentLabelIndex];
+      } else {
+        console.warn(`Aucun événement trouvé pour le sport sélectionné : ${this.videoInfo.selectedSport}`);
+        return null;
+      }
+    }
   },
   async created() {
     await this.loadSceneData();
@@ -140,11 +162,40 @@ export default {
       this.hoveredVideo = index;
     },
     handleClick(index) {
-      if (this.selectedVideos.includes(index)) {
-        this.selectedVideos = this.selectedVideos.filter(i => i !== index);
-      } else {
-        this.selectedVideos.push(index);
+      this.labelVideo(index); // Ajoute ou retire un label au clic
+    },
+    labelVideo(index) {
+      const label = this.currentLabel;
+      if (!label) {
+        console.error("Impossible d'étiqueter la vidéo : aucun label actuel n'est défini.");
+        return;
       }
+      
+      // Vérifie si la case possède déjà ce label
+      if (this.labeledVideos[index] === label) {
+        // Si oui, supprime le label
+        delete this.labeledVideos[index];
+        console.log(`Label supprimé pour l'index ${index}`);
+      } else {
+        // Sinon, attribue le label
+        this.labeledVideos[index] = label;
+        console.log(`Label attribué : ${label} pour l'index ${index}`);
+      }
+    },
+    handleKeydown(event) {
+      const key = parseInt(event.key);
+      const sportConfig = sportsConfigurations[this.videoInfo.selectedSport];
+      if (key > 0 && sportConfig && key <= sportConfig.events.length) {
+        this.currentLabelIndex = key - 1; // Change l'index du label
+        console.log("Label changé à :", this.currentLabel);
+      }
+    },
+    getLabelColor(index) {
+      const label = this.labeledVideos[index];
+      if (!label) return '#5e5e5e'; // Couleur par défaut si aucun label n'est attribué
+      const sportConfig = sportsConfigurations[this.videoInfo.selectedSport];
+      const eventIndex = sportConfig.events.indexOf(label);
+      return colors[eventIndex % colors.length]; // Associe une couleur basée sur l'index de l'événement
     }
   }
 };
@@ -176,7 +227,7 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   grid-auto-flow: column;
-  grid-template-rows: repeat(var(--num-rows), 1fr); /* Nombre de lignes fixé par numRows */
+  grid-template-rows: repeat(var(--num-rows), 1fr);
   gap: 3px;
 }
 
@@ -191,7 +242,7 @@ export default {
 }
 
 .video-section.selected {
-  border: 4px solid #f30101;
+  border-width: 4px;
 }
 
 .video-player {
@@ -219,5 +270,17 @@ export default {
   color: #888;
   font-size: 1.2em;
   text-align: center;
+}
+
+.label-text {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 12px;
+  /* font-weight: bold; */
+  color: #fff;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 2px 4px;
+  border-radius: 4px;
 }
 </style>
