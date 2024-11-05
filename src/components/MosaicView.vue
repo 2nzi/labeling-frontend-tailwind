@@ -130,35 +130,40 @@ export default {
       }
     },
     async uploadAndCompressVideo(file) {
-      const formData = new FormData();
-      formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-      try {
-        const response = await fetch("http://localhost:8000/upload-video", {
-          method: "POST",
-          body: formData,
-        });
+  try {
+    console.log("Début de l'upload...");
+    const response = await fetch("http://localhost:8000/upload-video", {
+      method: "POST",
+      body: formData,
+    });
 
-        if (response.ok) {
-          const data = await response.json();
-          this.compressedVideoUrl = data.compressed_video_path;
-          this.loading = false;
+    if (response.ok) {
+      const data = await response.json();
+      this.compressedVideoUrl = data.compressed_video_path;
+      console.log("Upload réussi, données reçues :", data);
+      this.loading = false;
 
-          const video = document.createElement("video");
-          video.src = this.compressedVideoUrl;
-          video.onloadedmetadata = () => {
-            const duration = video.duration;
-            this.initializeSegments(duration);
-          };
-        } else {
-          this.errorMessage = "Erreur lors de la compression de la vidéo.";
-          this.loading = false;
-        }
-      } catch (error) {
-        this.errorMessage = "Échec de la compression.";
-        this.loading = false;
-      }
-    },
+      const video = document.createElement("video");
+      video.src = this.compressedVideoUrl;
+      video.onloadedmetadata = () => {
+        const duration = video.duration;
+        this.initializeSegments(duration);
+        console.log("Segments initialisés pour la vidéo avec durée:", duration);
+      };
+    } else {
+      this.errorMessage = "Erreur lors de la compression de la vidéo.";
+      console.error("Erreur dans la réponse du serveur :", await response.text());
+      this.loading = false;
+    }
+  } catch (error) {
+    this.errorMessage = "Échec de la compression.";
+    console.error("Erreur lors de l'upload et compression :", error);
+    this.loading = false;
+  }
+},
     initializeSegments(duration) {
       this.segments = [];
       for (let startTime = 0; startTime < duration; startTime += this.segmentDuration) {

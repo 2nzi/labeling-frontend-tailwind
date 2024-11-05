@@ -6,17 +6,17 @@
         <input type="checkbox" v-model="showMosaicView" />
         <span class="slider"></span>
       </label>
-      <span>{{ showMosaicView ? "Mosaic View" : "Timeline Editor" }}</span>
+      <span>{{ showMosaicView ? "Timeline Editor" : "Mosaic View" }}</span>
     </div>
 
     <!-- Show TimelineEditor or MosaicView based on toggle -->
     <TimelineEditor
-      v-if="!showMosaicView"
+      v-if="showMosaicView"
       ref="timelineEditor"
       @videoUploaded="handleVideoUploaded"
     />
     <MosaicView
-      v-if="showMosaicView"
+      v-if="!showMosaicView"
       :activeLabel="activeLabel"
       @updateLabel="updateActiveLabel"
     />
