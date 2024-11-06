@@ -62,6 +62,7 @@
       />
   </div>
 </template>
+
 <script>
 import sportsConfigurations from "@/assets/sportsConfigurations.js";
 import colors from "@/assets/colors.js";
@@ -267,6 +268,9 @@ export default {
     generateLabelingData() {
     const labeledData = [];
     const duration = 1; // Supposons une durée de 1 seconde par clip
+    const videoId = this.videoInfo.scene_data_path
+    ? this.videoInfo.scene_data_path.split("/").pop().split("_")[0] // Extrait l'UUID du nom de fichier
+    : null;
 
     Object.entries(this.labeledVideos).forEach(([index, label]) => {
       const start = this.filteredClips[index].startTime;
@@ -313,7 +317,7 @@ export default {
 
     return {
       metadata: {
-        video_id: this.videoInfo.id || null,
+        video_id: videoId,
         duration_per_clip: duration
       },
       events: labeledData

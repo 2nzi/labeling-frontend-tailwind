@@ -26,16 +26,6 @@
         :videoInfo="videoInfo"
         @updateLabel="updateActiveLabel"
       />
-
-      <div class="export-controls">
-        <button 
-          @click="exportAsJSON" 
-          class="export-button"
-          :disabled="!isVideoLoaded"
-        >
-          Download JSON
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -44,7 +34,6 @@
 import UploadView from './components/UploadView.vue';
 import TimelineEditor from './components/TimelineEditor.vue';
 import MosaicView from './components/MosaicView.vue';
-import { saveAs } from 'file-saver';
 
 export default {
   components: {
@@ -61,25 +50,6 @@ export default {
     };
   },
   methods: {
-    exportAsJSON() {
-      const events = this.$refs.timelineEditor?.getEventsForExport();
-      if (!events) {
-        console.error("TimelineEditor is not loaded yet.");
-        return;
-      }
-      
-      const exportData = events.map(event => ({
-        event: event.event,
-        blocks: event.blocks.map(block => ({
-          id: block.id || block.name,
-          start: block.start,
-          end: block.end
-        }))
-      }));
-
-      const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-      saveAs(jsonBlob, "export_data.json");
-    },
 
     handleVideoUploaded(videoData) {
       this.isVideoLoaded = true;
